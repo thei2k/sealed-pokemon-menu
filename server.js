@@ -169,17 +169,20 @@ app.get("/api/inventory", function (req, res) {
         const yourPrice =
           typeof market === "number" ? Number((market * 0.9).toFixed(2)) : null;
 
-        return Promise.resolve({
-          name: item.name,
-          quantity: item.quantity,
-          tcgPlayerId: item.tcgPlayerId,
-          setName: item.lastSetName,
-          marketPrice: market,
-          yourPrice: yourPrice,
-          imageUrl: item.imageUrl || TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg",
-          tcgPlayerUrl:
-            "https://www.tcgplayer.com/product/" + item.tcgPlayerId,
-        });
+return Promise.resolve({
+  name: item.name,
+  quantity: item.quantity,
+  tcgPlayerId: item.tcgPlayerId,
+  setName: item.lastSetName,
+  marketPrice: market,
+  yourPrice: yourPrice,
+  imageUrl: item.imageUrl || TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg",
+  tcgPlayerUrl:
+    "https://www.tcgplayer.com/product/" + item.tcgPlayerId,
+  lastUpdated: item.lastUpdated || null,
+  fromCache: true
+});
+
       }
 
       // Otherwise fetch fresh data
@@ -196,37 +199,43 @@ app.get("/api/inventory", function (req, res) {
           cacheUpdated = true;
 
           return {
-            name: item.name,
-            quantity: item.quantity,
-            tcgPlayerId: item.tcgPlayerId,
-            setName: data.setName,
-            marketPrice: market,
-            yourPrice: yourPrice,
-            imageUrl: item.imageUrl || data.imageUrl,
-            tcgPlayerUrl: data.tcgPlayerUrl,
-          };
+  name: item.name,
+  quantity: item.quantity,
+  tcgPlayerId: item.tcgPlayerId,
+  setName: data.setName,
+  marketPrice: market,
+  yourPrice: yourPrice,
+  imageUrl: item.imageUrl || data.imageUrl,
+  tcgPlayerUrl: data.tcgPlayerUrl,
+  lastUpdated: item.lastUpdated || null,
+  fromCache: false
+};
+
         })
         .catch(function (err) {
           console.error(
             "Error fetching price for " + item.tcgPlayerId + ":",
             err.message
           );
-          return {
-            name: item.name,
-            quantity: item.quantity,
-            tcgPlayerId: item.tcgPlayerId,
-            setName: item.lastSetName || null,
-            marketPrice: item.lastMarketPrice || null,
-            yourPrice:
-              typeof item.lastMarketPrice === "number"
-                ? Number((item.lastMarketPrice * 0.9).toFixed(2))
-                : null,
-            imageUrl:
-              item.imageUrl || TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg",
-            tcgPlayerUrl:
-              "https://www.tcgplayer.com/product/" + item.tcgPlayerId,
-            priceError: err.message,
-          };
+         return {
+  name: item.name,
+  quantity: item.quantity,
+  tcgPlayerId: item.tcgPlayerId,
+  setName: item.lastSetName || null,
+  marketPrice: item.lastMarketPrice || null,
+  yourPrice:
+    typeof item.lastMarketPrice === "number"
+      ? Number((item.lastMarketPrice * 0.9).toFixed(2))
+      : null,
+  imageUrl:
+    item.imageUrl || TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg",
+  tcgPlayerUrl:
+    "https://www.tcgplayer.com/product/" + item.tcgPlayerId,
+  priceError: err.message,
+  lastUpdated: item.lastUpdated || null,
+  fromCache: isPriceFresh(item) // best guess
+};
+
         });
     })
   )

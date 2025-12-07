@@ -99,14 +99,16 @@ function renderInventory(data) {
 
     body.appendChild(footer);
 
-    if (item.error) {
-      const errorEl = document.createElement('div');
-      errorEl.className = 'price-label';
-      errorEl.style.color = '#f87171';
-      errorEl.style.marginTop = '0.35rem';
-      errorEl.textContent = item.error;
-      body.appendChild(errorEl);
-    }
+const errMsg = item.priceError || item.error;
+if (errMsg) {
+  const errorEl = document.createElement('div');
+  errorEl.className = 'price-label';
+  errorEl.style.color = '#f87171';
+  errorEl.style.marginTop = '0.35rem';
+  errorEl.textContent = errMsg;
+  body.appendChild(errorEl);
+}
+
 
     card.appendChild(imgWrapper);
     card.appendChild(body);
@@ -139,10 +141,30 @@ async function init() {
 
   try {
     const data = await fetchInventory();
-    renderInventory(data);
+renderInventory(data);
 
-    const now = new Date();
-    lastUpdatedEl.textContent = `Updated: ${now.toLocaleString()}`;
+const items = (data && data.items) || [];
+let latest = null;
+
+for (const item of items) {
+  if (item.lastUpdated) {
+    const t = new Date(item.lastUpdated);
+    if (!Number.isNaN(t.getTime())) {
+      if (!latest || t > latest) {
+        latest = t;
+      }
+    }
+  }
+}
+
+if (latest) {
+  lastUpdatedEl.textContent = `Prices last refreshed: ${latest.toLocaleString()}`;
+} else {
+  // fallback if nothing has a lastUpdated yet
+  const now = new Date();
+  lastUpdatedEl.textContent = `Prices loaded: ${now.toLocaleString()}`;
+}
+
   } catch (err) {
     console.error(err);
     lastUpdatedEl.textContent =
