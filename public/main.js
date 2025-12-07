@@ -19,7 +19,7 @@ function renderInventory(data) {
 
   grid.innerHTML = '';
 
-  const items = data.items || [];
+  const items = (data && data.items) || [];
 
   if (!items.length) {
     empty.classList.remove('hidden');
@@ -35,10 +35,7 @@ function renderInventory(data) {
     const imgWrapper = document.createElement('div');
     imgWrapper.className = 'product-image-wrapper';
 
-    const qtyBadge = document.createElement('div');
-    qtyBadge.className = 'quantity-badge';
-    qtyBadge.textContent = `Qty: ${item.quantity ?? 0}`;
-    imgWrapper.appendChild(qtyBadge);
+    // Quantity badge removed so customers don't see stock count
 
     const img = document.createElement('img');
     img.className = 'product-image';

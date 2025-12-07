@@ -11,15 +11,52 @@ const PORT = process.env.PORT || 3000;
 // JustTCG API settings
 const API_BASE = "https://api.justtcg.com/v1";
 const API_KEY = process.env.JUSTTCG_API_KEY;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // TCGplayer image base – we’ll append the productId + ".jpg"
 const TCG_IMAGE_BASE = "https://product-images.tcgplayer.com/fit-in/437x437/";
 
-// Serve static frontend files from /public
+// Serve JSON, then protected admin, then static files
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
 
 const INVENTORY_PATH = path.join(__dirname, "inventory.json");
+
+// ---------- Admin auth middleware ----------
+
+function requireAdminAuth(req, res, next) {
+  if (!ADMIN_PASSWORD) {
+    console.warn("ADMIN_PASSWORD not set; blocking admin access.");
+    return res.status(500).send("Admin not configured.");
+  }
+
+  const authHeader = req.headers["authorization"];
+
+  if (!authHeader || !authHeader.startsWith("Basic ")) {
+    res.setHeader("WWW-Authenticate", 'Basic realm="Admin Area"');
+    return res.status(401).send("Authentication required.");
+  }
+
+  const base64Part = authHeader.split(" ")[1];
+  const decoded = Buffer.from(base64Part, "base64").toString("utf8"); // "user:pass"
+  const parts = decoded.split(":");
+  const user = parts[0];
+  const pass = parts.slice(1).join(":");
+
+  if (user === "admin" && pass === ADMIN_PASSWORD) {
+    return next();
+  }
+
+  res.setHeader("WWW-Authenticate", 'Basic realm="Admin Area"');
+  return res.status(401).send("Invalid credentials.");
+}
+
+// Protect the admin HTML
+app.get("/admin.html", requireAdminAuth, function (req, res) {
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+
+// Static frontend files (index.html, JS, CSS, images, etc.)
+app.use(express.static(path.join(__dirname, "public")));
 
 // ---------- Helpers: inventory file ----------
 
@@ -122,7 +159,7 @@ app.get("/api/inventory", function (req, res) {
 
   Promise.all(
     visibleItems.map(function (item) {
-      // If we have a fresh cached price, use it and skip JustTCG
+      // Use cached price if fresh
       if (
         item.lastMarketPrice != null &&
         item.lastSetName &&
@@ -140,18 +177,19 @@ app.get("/api/inventory", function (req, res) {
           marketPrice: market,
           yourPrice: yourPrice,
           imageUrl: item.imageUrl || TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg",
-          tcgPlayerUrl: "https://www.tcgplayer.com/product/" + item.tcgPlayerId,
+          tcgPlayerUrl:
+            "https://www.tcgplayer.com/product/" + item.tcgPlayerId,
         });
       }
 
-      // Otherwise, fetch fresh data from JustTCG and update cache
+      // Otherwise fetch fresh data
       return fetchSealedProductByTcgPlayerId(item.tcgPlayerId)
         .then(function (data) {
           const market = data.marketPrice;
           const yourPrice =
             typeof market === "number" ? Number((market * 0.9).toFixed(2)) : null;
 
-          // Update cache fields on the underlying inventory item
+          // Update cache on the underlying item
           item.lastMarketPrice = data.marketPrice;
           item.lastSetName = data.setName;
           item.lastUpdated = new Date().toISOString();
@@ -193,7 +231,6 @@ app.get("/api/inventory", function (req, res) {
     })
   )
     .then(function (results) {
-      // If any cache entries changed, persist back to inventory.json
       if (cacheUpdated) {
         try {
           saveInventory(fullInventory);
@@ -201,8 +238,6 @@ app.get("/api/inventory", function (req, res) {
           console.error("Error saving updated cache to inventory.json:", err);
         }
       }
-
-      // Keep same shape the frontend expects: { items: [...] }
       res.json({ items: results });
     })
     .catch(function (err) {
@@ -213,11 +248,11 @@ app.get("/api/inventory", function (req, res) {
 
 // ---------- API: admin raw inventory get/save ----------
 
-app.get("/api/raw-inventory", function (req, res) {
+app.get("/api/raw-inventory", requireAdminAuth, function (req, res) {
   res.json(loadInventory());
 });
 
-app.post("/api/raw-inventory", function (req, res) {
+app.post("/api/raw-inventory", requireAdminAuth, function (req, res) {
   if (!Array.isArray(req.body)) {
     return res.status(400).json({ error: "Inventory must be an array" });
   }
@@ -227,7 +262,7 @@ app.post("/api/raw-inventory", function (req, res) {
 
 // ---------- API: admin save via /api/inventory (what admin.js uses) ----------
 
-app.post("/api/inventory", function (req, res) {
+app.post("/api/inventory", requireAdminAuth, function (req, res) {
   if (!Array.isArray(req.body)) {
     return res.status(400).json({ error: "Body must be an array" });
   }
