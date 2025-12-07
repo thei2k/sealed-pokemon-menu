@@ -37,6 +37,21 @@ function saveInventory(data) {
   fs.writeFileSync(INVENTORY_PATH, JSON.stringify(data, null, 2), "utf8");
 }
 
+// ---------- Helper: is cached price fresh (<= 24h) ----------
+
+function isPriceFresh(item) {
+  if (!item.lastUpdated) return false;
+  try {
+    const updatedMs = new Date(item.lastUpdated).getTime();
+    if (Number.isNaN(updatedMs)) return false;
+    const ageMs = Date.now() - updatedMs;
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    return ageMs < oneDayMs;
+  } catch (e) {
+    return false;
+  }
+}
+
 // ---------- Helper: fetch sealed price from JustTCG (NO await) ----------
 
 function fetchSealedProductByTcgPlayerId(tcgplayerId) {
@@ -96,20 +111,51 @@ function fetchSealedProductByTcgPlayerId(tcgplayerId) {
 // ---------- API: inventory with pricing (used by main site) ----------
 
 app.get("/api/inventory", function (req, res) {
-  // Only send items with quantity > 0 to customers
-  const inventory = loadInventory().filter(function (item) {
+  const fullInventory = loadInventory();
+
+  // Only show items with quantity > 0 to customers
+  const visibleItems = fullInventory.filter(function (item) {
     return item.quantity > 0;
   });
 
+  let cacheUpdated = false;
+
   Promise.all(
-    inventory.map(function (item) {
+    visibleItems.map(function (item) {
+      // If we have a fresh cached price, use it and skip JustTCG
+      if (
+        item.lastMarketPrice != null &&
+        item.lastSetName &&
+        isPriceFresh(item)
+      ) {
+        const market = item.lastMarketPrice;
+        const yourPrice =
+          typeof market === "number" ? Number((market * 0.9).toFixed(2)) : null;
+
+        return Promise.resolve({
+          name: item.name,
+          quantity: item.quantity,
+          tcgPlayerId: item.tcgPlayerId,
+          setName: item.lastSetName,
+          marketPrice: market,
+          yourPrice: yourPrice,
+          imageUrl: item.imageUrl || TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg",
+          tcgPlayerUrl: "https://www.tcgplayer.com/product/" + item.tcgPlayerId,
+        });
+      }
+
+      // Otherwise, fetch fresh data from JustTCG and update cache
       return fetchSealedProductByTcgPlayerId(item.tcgPlayerId)
         .then(function (data) {
           const market = data.marketPrice;
           const yourPrice =
-            typeof market === "number"
-              ? Number((market * 0.9).toFixed(2))
-              : null;
+            typeof market === "number" ? Number((market * 0.9).toFixed(2)) : null;
+
+          // Update cache fields on the underlying inventory item
+          item.lastMarketPrice = data.marketPrice;
+          item.lastSetName = data.setName;
+          item.lastUpdated = new Date().toISOString();
+          cacheUpdated = true;
 
           return {
             name: item.name,
@@ -118,8 +164,6 @@ app.get("/api/inventory", function (req, res) {
             setName: data.setName,
             marketPrice: market,
             yourPrice: yourPrice,
-            // If you ever add imageUrl in inventory.json, it wins;
-            // otherwise use the auto-built TCGplayer URL.
             imageUrl: item.imageUrl || data.imageUrl,
             tcgPlayerUrl: data.tcgPlayerUrl,
           };
@@ -133,10 +177,14 @@ app.get("/api/inventory", function (req, res) {
             name: item.name,
             quantity: item.quantity,
             tcgPlayerId: item.tcgPlayerId,
-            setName: null,
-            marketPrice: null,
-            yourPrice: null,
-            imageUrl: null,
+            setName: item.lastSetName || null,
+            marketPrice: item.lastMarketPrice || null,
+            yourPrice:
+              typeof item.lastMarketPrice === "number"
+                ? Number((item.lastMarketPrice * 0.9).toFixed(2))
+                : null,
+            imageUrl:
+              item.imageUrl || TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg",
             tcgPlayerUrl:
               "https://www.tcgplayer.com/product/" + item.tcgPlayerId,
             priceError: err.message,
@@ -145,6 +193,15 @@ app.get("/api/inventory", function (req, res) {
     })
   )
     .then(function (results) {
+      // If any cache entries changed, persist back to inventory.json
+      if (cacheUpdated) {
+        try {
+          saveInventory(fullInventory);
+        } catch (err) {
+          console.error("Error saving updated cache to inventory.json:", err);
+        }
+      }
+
       // Keep same shape the frontend expects: { items: [...] }
       res.json({ items: results });
     })
