@@ -1,0 +1,390 @@
+:root {
+  --bg: #050816;
+  --card-bg: #0b1020;
+  --accent: #f97316;
+  --accent-soft: rgba(249, 115, 22, 0.1);
+  --text: #f9fafb;
+  --muted: #9ca3af;
+  --border: #1f2933;
+  --danger: #f87171;
+  --radius-lg: 1.25rem;
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top, #111827 0, #020617 45%, #000 100%);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+
+.site-header {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  background: linear-gradient(
+    to right,
+    rgba(15, 23, 42, 0.95),
+    rgba(3, 7, 18, 0.95)
+  );
+  backdrop-filter: blur(16px);
+}
+
+.header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.header-inner h1 {
+  margin: 0;
+  font-size: 1.9rem;
+  letter-spacing: 0.03em;
+}
+
+.subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+/* Layout */
+
+.content {
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 2rem;
+  flex: 1;
+}
+
+/* Toolbar */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+#searchInput {
+  flex: 1 1 220px;
+  padding: 0.7rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--text);
+  outline: none;
+  font-size: 0.95rem;
+}
+
+#searchInput::placeholder {
+  color: rgba(148, 163, 184, 0.9);
+}
+
+#searchInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.6);
+}
+
+.last-updated {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* Products grid */
+
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.1rem;
+}
+
+.product-card {
+  background: linear-gradient(145deg, #020617, #020617);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(31, 41, 55, 0.9);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.product-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at top right,
+    rgba(249, 115, 22, 0.12),
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+.product-image-wrapper {
+  position: relative;
+  background: radial-gradient(circle at top, #111827, #020617);
+  padding: 0.75rem;
+}
+
+.product-image {
+  width: 100%;
+  height: 180px;
+  object-fit: contain;
+  display: block;
+  border-radius: 0.75rem;
+}
+
+.quantity-badge {
+  position: absolute;
+  top: 0.9rem;
+  left: 0.9rem;
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+}
+
+.product-body {
+  padding: 0.9rem 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  position: relative;
+  z-index: 1;
+}
+
+.product-name {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.product-set {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 0.35rem;
+}
+
+.price-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.price-value {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.price-your {
+  color: var(--accent);
+}
+
+.price-market {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.product-footer {
+  margin-top: 0.45rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tag-pill {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid rgba(249, 115, 22, 0.4);
+}
+
+.link {
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--accent);
+}
+
+/* Empty state */
+
+.empty-state {
+  margin-top: 2rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty-state.hidden {
+  display: none;
+}
+
+/* Admin styles */
+
+.admin-panel {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.admin-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+button,
+.primary-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  background: rgba(31, 41, 55, 0.9);
+  color: var(--text);
+}
+
+button:hover,
+.primary-btn:hover {
+  background: rgba(55, 65, 81, 1);
+}
+
+.primary-btn {
+  margin-top: 0.75rem;
+  background: var(--accent);
+  color: #111827;
+  font-weight: 600;
+}
+
+.primary-btn:hover {
+  background: #fb923c;
+}
+
+#inventoryTextarea {
+  width: 100%;
+  min-height: 260px;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  background: #020617;
+  color: var(--text);
+  padding: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.status-message {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.status-message.error {
+  color: var(--danger);
+}
+
+.status-message.success {
+  color: #4ade80;
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.hint-block {
+  background: #020617;
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.8rem;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+}
+
+/* Footer */
+
+.site-footer {
+  border-top: 1px solid rgba(15, 23, 42, 0.95);
+  padding: 0.75rem 1rem 1rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Responsive tweaks */
+
+@media (max-width: 640px) {
+  .header-inner h1 {
+    font-size: 1.5rem;
+  }
+}
+.table-wrapper {
+  margin-top: 0.75rem;
+  overflow-x: auto;
+}
+
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.inventory-table th,
+.inventory-table td {
+  border-bottom: 1px solid rgba(55, 65, 81, 0.8);
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+}
+
+.inventory-table th {
+  font-weight: 600;
+  color: #e5e7eb;
+  background: rgba(15, 23, 42, 0.9);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.admin-input {
+  width: 100%;
+  padding: 0.3rem 0.45rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(75, 85, 99, 0.9);
+  background: #020617;
+  color: #f9fafb;
+  font-size: 0.85rem;
+}
+
+.admin-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.6);
+}
+
