@@ -96,7 +96,10 @@ function fetchSealedProductByTcgPlayerId(tcgplayerId) {
 // ---------- API: inventory with pricing (used by main site) ----------
 
 app.get("/api/inventory", function (req, res) {
-  const inventory = loadInventory();
+  // Only send items with quantity > 0 to customers
+  const inventory = loadInventory().filter(function (item) {
+    return item.quantity > 0;
+  });
 
   Promise.all(
     inventory.map(function (item) {
