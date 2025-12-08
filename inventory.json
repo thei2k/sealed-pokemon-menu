@@ -2,52 +2,82 @@
   {
     "name": "Phantasmal Flames Booster Box",
     "tcgPlayerId": "654137",
-    "quantity": 2
+    "quantity": 2,
+    "setName": "ME02: Phantasmal Flames",
+    "marketPrice": 245.25,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/654137.jpg"
   },
   {
     "name": "Mega Evolution Enhanced Booster Box",
     "tcgPlayerId": "644300",
-    "quantity": 1
+    "quantity": 1,
+    "setName": "ME01: Mega Evolution",
+    "marketPrice": 233.54,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644300.jpg"
   },
   {
     "name": "Phantasmal Flames Pokemon Center Elite Trainer Box (Exclusive)",
     "tcgPlayerId": "654135",
-    "quantity": 4
+    "quantity": 4,
+    "setName": "ME02: Phantasmal Flames",
+    "marketPrice": 207.29,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/654135.jpg"
   },
   {
     "name": "Mega Evolution Pokemon Center Elite Trainer Box (Exclusive) [Mega Lucario]",
     "tcgPlayerId": "644282",
-    "quantity": 2
+    "quantity": 2,
+    "setName": "ME01: Mega Evolution",
+    "marketPrice": 177.15,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644282.jpg"
   },
   {
     "name": "Mega Evolution Pokemon Center Elite Trainer Box (Exclusive) [Mega Gardevoir]",
     "tcgPlayerId": "648415",
-    "quantity": 2
+    "quantity": 2,
+    "setName": "ME01: Mega Evolution",
+    "marketPrice": 167.99,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648415.jpg"
   },
   {
     "name": "Black Bolt Pokemon Center Elite Trainer Box (Exclusive)",
     "tcgPlayerId": "630687",
-    "quantity": 2
+    "quantity": 2,
+    "setName": "SV: Black Bolt",
+    "marketPrice": 150.87,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630687.jpg"
   },
   {
     "name": "White Flare Pokemon Center Elite Trainer Box (Exclusive)",
     "tcgPlayerId": "630688",
-    "quantity": 2
+    "quantity": 2,
+    "setName": "SV: White Flare",
+    "marketPrice": 129.22,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630688.jpg"
   },
   {
     "name": "Destined Rivals Elite Trainer Box",
     "tcgPlayerId": "624676",
-    "quantity": 2
+    "quantity": 2,
+    "setName": "SV10: Destined Rivals",
+    "marketPrice": 125.94,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/624676.jpg"
   },
   {
     "name": "Prismatic Evolutions Lucario ex & Tyranitar ex Premium Collection (Sam's Club)",
     "tcgPlayerId": "648365",
-    "quantity": 1
+    "quantity": 1,
+    "setName": "Miscellaneous Cards & Products",
+    "marketPrice": 116.87,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648365.jpg"
   },
   {
     "name": "Leafeon VSTAR Special Collection",
     "tcgPlayerId": "256147",
-    "quantity": 2
+    "quantity": 2,
+    "setName": "SWSH09: Brilliant Stars",
+    "marketPrice": 79.59,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/256147.jpg"
   },
   {
     "name": "Mega Evolution Elite Trainer Box [Mega Gardevoir]",
@@ -62,22 +92,34 @@
   {
     "name": "Professor Juniper Premium Tournament Collection Box",
     "tcgPlayerId": "268713",
-    "quantity": 2
+    "quantity": 2,
+    "setName": "Miscellaneous Cards & Products",
+    "marketPrice": 73.73,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/268713.jpg"
   },
   {
     "name": "Surging Sparks Elite Trainer Box",
     "tcgPlayerId": "565630",
-    "quantity": 8
+    "quantity": 8,
+    "setName": "SV08: Surging Sparks",
+    "marketPrice": 72.02,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/565630.jpg"
   },
   {
     "name": "Twilight Masquerade Elite Trainer Box",
     "tcgPlayerId": "543845",
-    "quantity": 5
+    "quantity": 5,
+    "setName": "SV06: Twilight Masquerade",
+    "marketPrice": 63.77,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/543845.jpg"
   },
   {
     "name": "Prismatic Evolutions Booster Bundle",
     "tcgPlayerId": "600518",
-    "quantity": 3
+    "quantity": 3,
+    "setName": "SV: Prismatic Evolutions",
+    "marketPrice": 59.33,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/600518.jpg"
   },
   {
     "name": "Gem Pack Vol. 2 Booster Box (CN)",
@@ -87,32 +129,50 @@
   {
     "name": "Black Bolt Booster Bundle",
     "tcgPlayerId": "630431",
-    "quantity": 15
+    "quantity": 15,
+    "setName": "SV: Black Bolt",
+    "marketPrice": 54.44,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630431.jpg"
   },
   {
     "name": "White Flare Booster Bundle",
     "tcgPlayerId": "630696",
-    "quantity": 13
+    "quantity": 13,
+    "setName": "SV: White Flare",
+    "marketPrice": 48.34,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630696.jpg"
   },
   {
     "name": "Mega Evolution Booster Bundle",
     "tcgPlayerId": "644362",
-    "quantity": 2
+    "quantity": 2,
+    "setName": "ME01: Mega Evolution",
+    "marketPrice": 47.7,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644362.jpg"
   },
   {
     "name": "Stellar Crown Booster Bundle",
     "tcgPlayerId": "557345",
-    "quantity": 12
+    "quantity": 12,
+    "setName": "SV07: Stellar Crown",
+    "marketPrice": 48.11,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/557345.jpg"
   },
   {
     "name": "White Flare Binder Collection",
     "tcgPlayerId": "630695",
-    "quantity": 2
+    "quantity": 2,
+    "setName": "SV: White Flare",
+    "marketPrice": 46.16,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630695.jpg"
   },
   {
     "name": "Prismatic Evolutions Surprise Box",
     "tcgPlayerId": "593466",
-    "quantity": 20
+    "quantity": 20,
+    "setName": "SV: Prismatic Evolutions",
+    "marketPrice": 42.82,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/593466.jpg"
   },
   {
     "name": "Surging Sparks Booster Bundle",
@@ -127,12 +187,18 @@
   {
     "name": "Unova Victini Illustration Collection",
     "tcgPlayerId": "630615",
-    "quantity": 4
+    "quantity": 4,
+    "setName": "SV: Black Bolt",
+    "marketPrice": 40.07,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630615.jpg"
   },
   {
     "name": "Paradox Rift Build & Battle Box",
     "tcgPlayerId": "514068",
-    "quantity": 3
+    "quantity": 3,
+    "setName": "SV04: Paradox Rift",
+    "marketPrice": 32.67,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/514068.jpg"
   },
   {
     "name": "Prismatic Evolutions 2Blister [Eevee]",
@@ -142,76 +208,121 @@
   {
     "name": "Mega Latias ex Box",
     "tcgPlayerId": "654188",
-    "quantity": 1
+    "quantity": 1,
+    "setName": "Miscellaneous Cards & Products",
+    "marketPrice": 28.77,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/654188.jpg"
   },
   {
     "name": "Black Bolt Tech Sticker Collection",
     "tcgPlayerId": "630614",
-    "quantity": 4
+    "quantity": 4,
+    "setName": "SV: Black Bolt",
+    "marketPrice": 27.95,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630614.jpg"
   },
   {
     "name": "Prismatic Evolutions Poster Collection",
     "tcgPlayerId": "593359",
-    "quantity": 14
+    "quantity": 14,
+    "setName": "SV: Prismatic Evolutions",
+    "marketPrice": 25.64,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/593359.jpg"
   },
   {
     "name": "Pokemon - Poke Ball Tin - Poke Ball (Q4 2024)",
     "tcgPlayerId": "587365",
-    "quantity": 5
+    "quantity": 5,
+    "setName": "Miscellaneous Cards & Products",
+    "marketPrice": 22.39,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/587365.jpg"
   },
   {
     "name": "Pokemon - Poke Ball Tin - Moon Ball (Q4 2024)",
     "tcgPlayerId": "587369",
-    "quantity": 3
+    "quantity": 3,
+    "setName": "Miscellaneous Cards & Products",
+    "marketPrice": 21.8,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/587369.jpg"
   },
   {
     "name": "Silver Tempest Booster Pack",
     "tcgPlayerId": "283388",
-    "quantity": 3
+    "quantity": 3,
+    "setName": "SWSH12: Silver Tempest",
+    "marketPrice": 9.27,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/283388.jpg"
   },
   {
     "name": "Astral Radiance Sleeved Booster Pack",
     "tcgPlayerId": "265526",
-    "quantity": 1
+    "quantity": 1,
+    "setName": "SWSH10: Astral Radiance",
+    "marketPrice": 8.96,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/265526.jpg"
   },
   {
     "name": "Paldea Evolved Booster Pack",
     "tcgPlayerId": "493976",
-    "quantity": 3
+    "quantity": 3,
+    "setName": "SV02: Paldea Evolved",
+    "marketPrice": 8.27,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/493976.jpg"
   },
   {
     "name": "Mega Evolution Sleeved Booster Pack",
     "tcgPlayerId": "644354",
-    "quantity": 6
+    "quantity": 6,
+    "setName": "ME01: Mega Evolution",
+    "marketPrice": 7.85,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644354.jpg"
   },
   {
     "name": "Darkness Ablaze Booster Pack",
     "tcgPlayerId": "216852",
-    "quantity": 1
+    "quantity": 1,
+    "setName": "SWSH03: Darkness Ablaze",
+    "marketPrice": 7.67,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/216852.jpg"
   },
   {
     "name": "Paradox Rift Sleeved Booster Pack",
     "tcgPlayerId": "517210",
-    "quantity": 3
+    "quantity": 3,
+    "setName": "SV04: Paradox Rift",
+    "marketPrice": 7.38,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/517210.jpg"
   },
   {
     "name": "Stellar Crown Booster Pack",
     "tcgPlayerId": "557331",
-    "quantity": 15
+    "quantity": 15,
+    "setName": "SV07: Stellar Crown",
+    "marketPrice": 6.85,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/557331.jpg"
   },
   {
     "name": "Scarlet & Violet Booster Pack",
     "tcgPlayerId": "476451",
-    "quantity": 3
+    "quantity": 3,
+    "setName": "SV01: Scarlet & Violet Base Set",
+    "marketPrice": 6.35,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/476451.jpg"
   },
   {
     "name": "Temporal Forces Booster Pack",
     "tcgPlayerId": "532841",
-    "quantity": 15
+    "quantity": 15,
+    "setName": "SV05: Temporal Forces",
+    "marketPrice": 6.56,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/532841.jpg"
   },
   {
     "name": "Twilight Masquerade Booster Pack",
     "tcgPlayerId": "543843",
-    "quantity": 13
+    "quantity": 13,
+    "setName": "SV06: Twilight Masquerade",
+    "marketPrice": 5.83,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/543843.jpg"
   }
 ]
