@@ -1,4 +1,5 @@
 // server.js - Strategy A: no live JustTCG calls in production
+// All prices are served from inventory.json. You refresh them offline with updatePrices.js.
 
 require("dotenv").config();
 const express = require("express");
@@ -58,12 +59,19 @@ app.get("/admin.html", requireAdminAuth, function (req, res) {
 // Serve static frontend files (index.html, JS, CSS, etc.)
 app.use(express.static(path.join(__dirname, "public")));
 
-// ---------- Helpers: inventory file ----------
+// ---------- Inventory helpers ----------
 
 function loadInventory() {
   try {
     const raw = fs.readFileSync(INVENTORY_PATH, "utf8");
-    return JSON.parse(raw);
+    const data = JSON.parse(raw);
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && Array.isArray(data.items)) {
+      return data.items;
+    }
+    return [];
   } catch (err) {
     console.error("Error reading inventory.json:", err.message);
     return [];
@@ -81,13 +89,20 @@ app.get("/api/inventory", function (req, res) {
 
   // Only show items with quantity > 0
   const visibleItems = fullInventory.filter(function (item) {
-    return item.quantity > 0;
+    return item && typeof item.quantity === "number" && item.quantity > 0;
   });
 
   const items = visibleItems.map(function (item) {
-    const market = typeof item.marketPrice === "number" ? item.marketPrice : null;
+    const market =
+      typeof item.marketPrice === "number" ? item.marketPrice : null;
+
+    // Prefer stored yourPrice if numeric; otherwise derive from market
     const yourPrice =
-      typeof market === "number" ? Number((market * 0.9).toFixed(2)) : null;
+      typeof item.yourPrice === "number"
+        ? item.yourPrice
+        : typeof market === "number"
+        ? Number((market * 0.9).toFixed(2))
+        : null;
 
     return {
       name: item.name,
@@ -96,12 +111,16 @@ app.get("/api/inventory", function (req, res) {
       setName: item.setName || null,
       marketPrice: market,
       yourPrice: yourPrice,
-      imageUrl: item.imageUrl || (item.tcgPlayerId
-        ? TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg"
-        : null),
+      imageUrl:
+        item.imageUrl ||
+        (item.tcgPlayerId
+          ? TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg"
+          : null),
       tcgPlayerUrl: item.tcgPlayerId
         ? "https://www.tcgplayer.com/product/" + item.tcgPlayerId
-        : null
+        : null,
+      // Expose lastUpdated so the frontend can display “Prices last refreshed”
+      lastUpdated: item.lastUpdated || null,
     };
   });
 
@@ -110,6 +129,7 @@ app.get("/api/inventory", function (req, res) {
 
 // ---------- API: admin raw inventory get/save ----------
 
+// Raw inventory for admin UI table (no filtering, full objects)
 app.get("/api/raw-inventory", requireAdminAuth, function (req, res) {
   res.json(loadInventory());
 });
@@ -117,7 +137,7 @@ app.get("/api/raw-inventory", requireAdminAuth, function (req, res) {
 /**
  * Admin JSON save from /admin.html.
  * We MERGE admin-edited items into existing inventory so we preserve
- * setName / marketPrice / imageUrl until you refresh them with updatePrices.js.
+ * setName / marketPrice / yourPrice / imageUrl / lastUpdated until you refresh via updatePrices.js.
  */
 app.post("/api/inventory", requireAdminAuth, function (req, res) {
   if (!Array.isArray(req.body)) {
@@ -129,6 +149,7 @@ app.post("/api/inventory", requireAdminAuth, function (req, res) {
 
   // Use tcgPlayerId as key; fallback to name
   for (const item of existing) {
+    if (!item) continue;
     const key = item.tcgPlayerId || item.name;
     if (key) {
       byKey.set(key, item);
@@ -142,28 +163,25 @@ app.post("/api/inventory", requireAdminAuth, function (req, res) {
     const base = {
       name: incoming.name,
       tcgPlayerId: incoming.tcgPlayerId,
-      quantity: incoming.quantity
+      quantity: incoming.quantity,
     };
 
     if (old) {
       base.setName = old.setName;
       base.marketPrice = old.marketPrice;
       base.imageUrl = old.imageUrl;
+      base.yourPrice = old.yourPrice;
+      base.lastUpdated = old.lastUpdated;
     }
 
     return base;
   });
 
   saveInventory(merged);
-
-  res.json({
-    ok: true,
-    success: true,
-    count: merged.length
-  });
+  res.json({ ok: true, count: merged.length });
 });
 
-// (Optional: keep /api/raw-inventory POST if you're using it; otherwise not needed)
+// (Optional: if you ever want to overwrite inventory.json directly)
 // app.post("/api/raw-inventory", requireAdminAuth, function (req, res) {
 //   if (!Array.isArray(req.body)) {
 //     return res.status(400).json({ error: "Inventory must be an array" });

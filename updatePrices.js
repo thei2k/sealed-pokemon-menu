@@ -22,10 +22,22 @@ if (!API_KEY) {
 
 const INVENTORY_PATH = path.join(__dirname, "inventory.json");
 
+// Max 30 calls per rolling minute to stay under your 50/min JustTCG plan
+const MAX_CALLS_PER_MINUTE = 30;
+let apiCallTimestamps = [];
+
 function loadInventory() {
   try {
     const raw = fs.readFileSync(INVENTORY_PATH, "utf8");
-    return JSON.parse(raw);
+    const data = JSON.parse(raw);
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && Array.isArray(data.items)) {
+      return data.items;
+    }
+    console.warn("inventory.json was not an array; defaulting to []");
+    return [];
   } catch (err) {
     console.error("Error reading inventory.json:", err.message);
     process.exit(1);
@@ -46,8 +58,8 @@ async function fetchSealedPrice(tcgPlayerId) {
   const res = await fetch(url, {
     headers: {
       "x-api-key": API_KEY,
-      Accept: "application/json"
-    }
+      Accept: "application/json",
+    },
   });
 
   if (!res.ok) {
@@ -73,20 +85,23 @@ async function fetchSealedPrice(tcgPlayerId) {
       return v.condition === "Sealed";
     }) || (card.variants || [])[0];
 
-  if (!variant || typeof variant.price !== "number") {
+  if (!variant || variant.price == null) {
     throw new Error("No price found for " + tcgPlayerId);
+  }
+
+  const price = Number(variant.price);
+  if (!Number.isFinite(price)) {
+    throw new Error("Invalid numeric price for " + tcgPlayerId);
   }
 
   return {
     name: card.name,
     setName: card.set_name,
-    marketPrice: variant.price
+    marketPrice: price,
   };
 }
-const MAX_CALLS_PER_MINUTE = 10;
-let apiCallTimestamps = [];
 
-// Wrap JustTCG calls so we never exceed 10 requests per rolling 60 seconds
+// Wrap JustTCG calls so we never exceed MAX_CALLS_PER_MINUTE per rolling 60 seconds
 async function rateLimitedFetchSealedPrice(tcgPlayerId) {
   const now = Date.now();
 
@@ -109,7 +124,6 @@ async function rateLimitedFetchSealedPrice(tcgPlayerId) {
   return fetchSealedPrice(tcgPlayerId);
 }
 
-
 async function main() {
   const inventory = loadInventory();
 
@@ -131,29 +145,36 @@ async function main() {
 
     try {
       console.log(
-  `[${i + 1}/${inventory.length}] Fetching price for "${item.name}" (TCGplayer ${item.tcgPlayerId})...`
-);
+        `[${i + 1}/${inventory.length}] Fetching price for "${item.name}" (TCGplayer ${item.tcgPlayerId})...`
+      );
 
-const data = await rateLimitedFetchSealedPrice(item.tcgPlayerId);
+      const data = await rateLimitedFetchSealedPrice(item.tcgPlayerId);
 
-item.setName = data.setName;
-item.marketPrice = data.marketPrice;
-// You can override/keep custom images; here we just set a default
-if (!item.imageUrl) {
-  item.imageUrl = TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg";
-}
+      item.setName = data.setName;
+      item.marketPrice = data.marketPrice;
 
-console.log(
-  `  -> Updated: marketPrice = ${data.marketPrice.toFixed(2)}, setName = ${data.setName}`
-);
+      // Explicitly store your 90% price as well
+      item.yourPrice = Number((data.marketPrice * 0.9).toFixed(2));
 
-// ❌ REMOVE this; the rate limiter now controls pacing
-// await new Promise((resolve) => setTimeout(resolve, 300));
+      // Stamp when this item's price was last refreshed
+      item.lastUpdated = new Date().toISOString();
 
+      // Default image if missing
+      if (!item.imageUrl) {
+        item.imageUrl = TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg";
+      }
+
+      console.log(
+        `  -> Updated: marketPrice = ${item.marketPrice.toFixed(
+          2
+        )}, yourPrice = ${item.yourPrice.toFixed(
+          2
+        )}, setName = ${item.setName}, lastUpdated = ${item.lastUpdated}`
+      );
     } catch (err) {
       console.error(
         `[${i + 1}/${inventory.length}] Error updating "${item.name}":`,
-        err.message
+        err.message || err
       );
       // Keep old price if any; just log the problem
     }
