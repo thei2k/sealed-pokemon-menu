@@ -4,7 +4,7 @@
     "tcgPlayerId": "654137",
     "quantity": 2,
     "setName": "ME02: Phantasmal Flames",
-    "marketPrice": 245.25,
+    "marketPrice": 228.35,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/654137.jpg"
   },
   {
@@ -12,7 +12,7 @@
     "tcgPlayerId": "644300",
     "quantity": 1,
     "setName": "ME01: Mega Evolution",
-    "marketPrice": 233.54,
+    "marketPrice": 227.69,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644300.jpg"
   },
   {
@@ -20,7 +20,7 @@
     "tcgPlayerId": "654135",
     "quantity": 4,
     "setName": "ME02: Phantasmal Flames",
-    "marketPrice": 207.29,
+    "marketPrice": 201.54,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/654135.jpg"
   },
   {
@@ -28,7 +28,7 @@
     "tcgPlayerId": "644282",
     "quantity": 2,
     "setName": "ME01: Mega Evolution",
-    "marketPrice": 177.15,
+    "marketPrice": 177.13,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644282.jpg"
   },
   {
@@ -36,7 +36,7 @@
     "tcgPlayerId": "648415",
     "quantity": 2,
     "setName": "ME01: Mega Evolution",
-    "marketPrice": 167.99,
+    "marketPrice": 166.46,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648415.jpg"
   },
   {
@@ -44,7 +44,7 @@
     "tcgPlayerId": "630687",
     "quantity": 2,
     "setName": "SV: Black Bolt",
-    "marketPrice": 150.87,
+    "marketPrice": 139.27,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630687.jpg"
   },
   {
@@ -52,7 +52,7 @@
     "tcgPlayerId": "630688",
     "quantity": 2,
     "setName": "SV: White Flare",
-    "marketPrice": 129.22,
+    "marketPrice": 123.67,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630688.jpg"
   },
   {
@@ -60,7 +60,7 @@
     "tcgPlayerId": "624676",
     "quantity": 2,
     "setName": "SV10: Destined Rivals",
-    "marketPrice": 125.94,
+    "marketPrice": 127.24,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/624676.jpg"
   },
   {
@@ -68,7 +68,7 @@
     "tcgPlayerId": "648365",
     "quantity": 1,
     "setName": "Miscellaneous Cards & Products",
-    "marketPrice": 116.87,
+    "marketPrice": 117.99,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648365.jpg"
   },
   {
@@ -82,12 +82,18 @@
   {
     "name": "Mega Evolution Elite Trainer Box [Mega Gardevoir]",
     "tcgPlayerId": "644279",
-    "quantity": 1
+    "quantity": 1,
+    "setName": "ME01: Mega Evolution",
+    "marketPrice": 78.81,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644279.jpg"
   },
   {
     "name": "Holiday Calendar 2025",
     "tcgPlayerId": "639828",
-    "quantity": 5
+    "quantity": 5,
+    "setName": "Miscellaneous Cards & Products",
+    "marketPrice": 78.01,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/639828.jpg"
   },
   {
     "name": "Professor Juniper Premium Tournament Collection Box",
@@ -102,7 +108,7 @@
     "tcgPlayerId": "565630",
     "quantity": 8,
     "setName": "SV08: Surging Sparks",
-    "marketPrice": 72.02,
+    "marketPrice": 69,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/565630.jpg"
   },
   {
@@ -110,7 +116,7 @@
     "tcgPlayerId": "543845",
     "quantity": 5,
     "setName": "SV06: Twilight Masquerade",
-    "marketPrice": 63.77,
+    "marketPrice": 63.7,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/543845.jpg"
   },
   {
@@ -118,7 +124,7 @@
     "tcgPlayerId": "600518",
     "quantity": 3,
     "setName": "SV: Prismatic Evolutions",
-    "marketPrice": 59.33,
+    "marketPrice": 58.68,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/600518.jpg"
   },
   {
@@ -131,7 +137,7 @@
     "tcgPlayerId": "630431",
     "quantity": 15,
     "setName": "SV: Black Bolt",
-    "marketPrice": 54.44,
+    "marketPrice": 55.7,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630431.jpg"
   },
   {
@@ -139,7 +145,7 @@
     "tcgPlayerId": "630696",
     "quantity": 13,
     "setName": "SV: White Flare",
-    "marketPrice": 48.34,
+    "marketPrice": 47.29,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630696.jpg"
   },
   {
@@ -147,7 +153,7 @@
     "tcgPlayerId": "644362",
     "quantity": 2,
     "setName": "ME01: Mega Evolution",
-    "marketPrice": 47.7,
+    "marketPrice": 48.16,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644362.jpg"
   },
   {
@@ -155,7 +161,7 @@
     "tcgPlayerId": "557345",
     "quantity": 12,
     "setName": "SV07: Stellar Crown",
-    "marketPrice": 48.11,
+    "marketPrice": 48.26,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/557345.jpg"
   },
   {
@@ -163,7 +169,7 @@
     "tcgPlayerId": "630695",
     "quantity": 2,
     "setName": "SV: White Flare",
-    "marketPrice": 46.16,
+    "marketPrice": 45.58,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630695.jpg"
   },
   {
@@ -171,25 +177,31 @@
     "tcgPlayerId": "593466",
     "quantity": 20,
     "setName": "SV: Prismatic Evolutions",
-    "marketPrice": 42.82,
+    "marketPrice": 42.11,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/593466.jpg"
   },
   {
     "name": "Surging Sparks Booster Bundle",
     "tcgPlayerId": "565629",
-    "quantity": 10
+    "quantity": 10,
+    "setName": "SV08: Surging Sparks",
+    "marketPrice": 42.21,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/565629.jpg"
   },
   {
     "name": "Ogerpon ex Premium Collection",
     "tcgPlayerId": "576482",
-    "quantity": 1
+    "quantity": 1,
+    "setName": "Miscellaneous Cards & Products",
+    "marketPrice": 41.98,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/576482.jpg"
   },
   {
     "name": "Unova Victini Illustration Collection",
     "tcgPlayerId": "630615",
     "quantity": 4,
     "setName": "SV: Black Bolt",
-    "marketPrice": 40.07,
+    "marketPrice": 40.89,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630615.jpg"
   },
   {
@@ -197,7 +209,7 @@
     "tcgPlayerId": "514068",
     "quantity": 3,
     "setName": "SV04: Paradox Rift",
-    "marketPrice": 32.67,
+    "marketPrice": 32.99,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/514068.jpg"
   },
   {
@@ -210,7 +222,7 @@
     "tcgPlayerId": "654188",
     "quantity": 1,
     "setName": "Miscellaneous Cards & Products",
-    "marketPrice": 28.77,
+    "marketPrice": 27.75,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/654188.jpg"
   },
   {
@@ -218,7 +230,7 @@
     "tcgPlayerId": "630614",
     "quantity": 4,
     "setName": "SV: Black Bolt",
-    "marketPrice": 27.95,
+    "marketPrice": 28.47,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630614.jpg"
   },
   {
@@ -226,7 +238,7 @@
     "tcgPlayerId": "593359",
     "quantity": 14,
     "setName": "SV: Prismatic Evolutions",
-    "marketPrice": 25.64,
+    "marketPrice": 25,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/593359.jpg"
   },
   {
@@ -234,7 +246,7 @@
     "tcgPlayerId": "587365",
     "quantity": 5,
     "setName": "Miscellaneous Cards & Products",
-    "marketPrice": 22.39,
+    "marketPrice": 22,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/587365.jpg"
   },
   {
@@ -250,7 +262,7 @@
     "tcgPlayerId": "283388",
     "quantity": 3,
     "setName": "SWSH12: Silver Tempest",
-    "marketPrice": 9.27,
+    "marketPrice": 9.22,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/283388.jpg"
   },
   {
@@ -258,7 +270,7 @@
     "tcgPlayerId": "265526",
     "quantity": 1,
     "setName": "SWSH10: Astral Radiance",
-    "marketPrice": 8.96,
+    "marketPrice": 9.02,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/265526.jpg"
   },
   {
@@ -266,7 +278,7 @@
     "tcgPlayerId": "493976",
     "quantity": 3,
     "setName": "SV02: Paldea Evolved",
-    "marketPrice": 8.27,
+    "marketPrice": 8.72,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/493976.jpg"
   },
   {
@@ -274,7 +286,7 @@
     "tcgPlayerId": "644354",
     "quantity": 6,
     "setName": "ME01: Mega Evolution",
-    "marketPrice": 7.85,
+    "marketPrice": 7.42,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644354.jpg"
   },
   {
@@ -282,7 +294,7 @@
     "tcgPlayerId": "216852",
     "quantity": 1,
     "setName": "SWSH03: Darkness Ablaze",
-    "marketPrice": 7.67,
+    "marketPrice": 7.59,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/216852.jpg"
   },
   {
@@ -290,7 +302,7 @@
     "tcgPlayerId": "517210",
     "quantity": 3,
     "setName": "SV04: Paradox Rift",
-    "marketPrice": 7.38,
+    "marketPrice": 7.41,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/517210.jpg"
   },
   {
@@ -298,7 +310,7 @@
     "tcgPlayerId": "557331",
     "quantity": 15,
     "setName": "SV07: Stellar Crown",
-    "marketPrice": 6.85,
+    "marketPrice": 7.07,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/557331.jpg"
   },
   {
@@ -306,7 +318,7 @@
     "tcgPlayerId": "476451",
     "quantity": 3,
     "setName": "SV01: Scarlet & Violet Base Set",
-    "marketPrice": 6.35,
+    "marketPrice": 6.24,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/476451.jpg"
   },
   {
@@ -314,7 +326,7 @@
     "tcgPlayerId": "532841",
     "quantity": 15,
     "setName": "SV05: Temporal Forces",
-    "marketPrice": 6.56,
+    "marketPrice": 6.55,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/532841.jpg"
   },
   {
@@ -322,7 +334,7 @@
     "tcgPlayerId": "543843",
     "quantity": 13,
     "setName": "SV06: Twilight Masquerade",
-    "marketPrice": 5.83,
+    "marketPrice": 6.12,
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/543843.jpg"
   }
 ]
