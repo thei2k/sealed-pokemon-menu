@@ -1,14 +1,58 @@
 [
   {
-    "name": "Pokemon TCG: Trainer's Toolkit (2025)",
-    "setName": null,
+    "name": "Duskmourn: House of Horror Commander Deck - Endless Punishment",
+    "setName": "Commander: Duskmourn: House of Horror",
+    "quantity": 3,
+    "marketPrice": 77.09,
+    "yourPrice": 69.38,
+    "lastUpdated": "2025-12-11T02:02:17.882Z",
+    "tcgPlayerId": "557256",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/557256",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/557256.jpg"
+  },
+  {
+    "name": "Marvel's Spider-Man - Collector Booster Display",
+    "setName": "Marvel's Spider-Man",
+    "quantity": 1,
+    "marketPrice": 358.04,
+    "yourPrice": 322.24,
+    "lastUpdated": "2025-12-11T02:02:17.884Z",
+    "tcgPlayerId": "621110",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/621110",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/621110.jpg"
+  },
+  {
+    "name": "Modern Horizons 3 Commander Deck Display",
+    "setName": "Commander: Modern Horizons 3",
     "quantity": 2,
-    "marketPrice": null,
-    "yourPrice": null,
-    "lastUpdated": null,
+    "marketPrice": 179.22,
+    "yourPrice": 161.3,
+    "lastUpdated": "2025-12-11T02:02:17.881Z",
+    "tcgPlayerId": "541196",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/541196",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/541196.jpg"
+  },
+  {
+    "name": "Pokemon TCG: Trainer's Toolkit (2025)",
+    "setName": "Miscellaneous Cards & Products",
+    "quantity": 2,
+    "marketPrice": 29.03,
+    "yourPrice": 26.13,
+    "lastUpdated": "2025-12-11T02:02:17.884Z",
     "tcgPlayerId": "653203",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/653203",
-    "imageUrl": null
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/653203.jpg"
+  },
+  {
+    "name": "vatar: The Last Airbender - Collector Booster Display",
+    "setName": "Avatar: The Last Airbender",
+    "quantity": 1,
+    "marketPrice": 374.7,
+    "yourPrice": 337.23,
+    "lastUpdated": "2025-12-11T02:02:17.884Z",
+    "tcgPlayerId": "648650",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/648650",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648650.jpg"
   },
   {
     "name": "Mega Evolution Booster Bundle",
