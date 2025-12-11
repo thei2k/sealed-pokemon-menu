@@ -25,11 +25,11 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-const BATCH_SIZE = 100; // your plan allows 100 IDs/request
+const BATCH_SIZE = 20; // your plan allows 100 IDs/request
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 // Conservative rate limit: 40 batch calls/minute (4000 IDs/min effective)
-const MAX_BATCH_CALLS_PER_MIN = 40;
+const MAX_BATCH_CALLS_PER_MIN = 10;
 const PRICE_MULTIPLIER = 0.9;
 
 let batchCallTimestamps = [];
