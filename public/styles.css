@@ -108,18 +108,75 @@ main {
   padding: 22px 16px 40px;
 }
 
-/* Toolbar: search + last updated */
+/* ---------- Toolbar: sticky search + filters + sort ---------- */
 
 .toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   margin-bottom: 20px;
+  padding: 10px 0 12px;
+  background: linear-gradient(to bottom, #020617, rgba(2, 6, 23, 0.95));
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(30, 64, 175, 0.4);
 }
 
+.toolbar-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.toolbar-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Game toggle buttons */
+
+.game-toggle {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.65);
+}
+
+.toggle-btn {
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toggle-btn:hover {
+  background-color: rgba(30, 64, 175, 0.5);
+}
+
+.toggle-active {
+  background: linear-gradient(to right, #22c55e, #3b82f6);
+  color: #0b1120;
+}
+
+/* Search input */
+
 #searchInput {
-  flex: 1 1 230px;
+  flex: 1 1 160px;
   min-width: 0;
   padding: 10px 12px;
   border-radius: 999px;
@@ -142,14 +199,33 @@ main {
   background-color: #020617;
 }
 
-#lastUpdated {
+/* Sort dropdown + last updated */
+
+.sort-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+#sortSelect {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  background-color: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
   font-size: 0.85rem;
+}
+
+#lastUpdated {
+  font-size: 0.8rem;
   color: #9ca3af;
 }
 
 /* ---------- Products grid container ---------- */
 
-/* Now acts as a vertical stack of groups (heading + subgrid) */
+/* Vertical stack of groups (heading + subgrid) */
 #productsGrid {
   display: flex;
   flex-direction: column;
@@ -240,9 +316,23 @@ main {
   color: #0f172a;
 }
 
+/* Set chip + set text */
+
+.set-chip {
+  display: inline-block;
+  margin-top: 2px;
+  margin-bottom: 2px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
 .product-set {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: #6b7280;
 }
 
@@ -282,6 +372,32 @@ main {
 }
 
 .product-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Footer ---------- */
+
+.app-footer {
+  margin-top: auto;
+  padding: 14px 16px 20px;
+  border-top: 1px solid rgba(30, 64, 175, 0.4);
+  background: #020617;
+}
+
+.app-footer p {
+  max-width: 1120px;
+  margin: 0 auto;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.app-footer a {
+  color: #60a5fa;
+  text-decoration: none;
+}
+
+.app-footer a:hover {
   text-decoration: underline;
 }
 

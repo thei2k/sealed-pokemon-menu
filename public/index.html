@@ -4,11 +4,15 @@
     <meta charset="utf-8" />
     <title>Sealed Pokémon Inventory</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Favicon (you can drop a favicon.ico in /public) -->
+    <link rel="icon" href="/favicon.ico" />
+
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="app-root">
-      <!-- Hero / banner area -->
+      <!-- Hero / banner -->
       <header class="app-header">
         <div class="app-header-inner">
           <div class="logo-pill">
@@ -19,22 +23,62 @@
           <div class="hero-text">
             <h1 class="page-title">Sealed Pokémon Inventory</h1>
             <p class="page-subtitle">
-              Live pricing on sealed product, powered by JustTCG and updated regularly.
+              Live pricing on sealed product, updated automatically from JustTCG.
             </p>
           </div>
         </div>
       </header>
 
-      <!-- Main content shell -->
+      <!-- Main content -->
       <main>
+        <!-- Sticky toolbar: game filter + search + sort + last updated -->
         <section class="toolbar">
-          <input
-            id="searchInput"
-            type="text"
-            placeholder="Search by product name or set..."
-            autocomplete="off"
-          />
-          <div id="lastUpdated">Prices last refreshed: N/A</div>
+          <div class="toolbar-left">
+            <div class="game-toggle" id="gameToggle">
+              <button
+                type="button"
+                class="toggle-btn toggle-active"
+                data-game="all"
+              >
+                All
+              </button>
+              <button
+                type="button"
+                class="toggle-btn"
+                data-game="pokemon"
+              >
+                Pokémon
+              </button>
+              <button
+                type="button"
+                class="toggle-btn"
+                data-game="mtg"
+              >
+                Magic
+              </button>
+            </div>
+
+            <input
+              id="searchInput"
+              type="text"
+              placeholder="Search by product name or set..."
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="toolbar-right">
+            <label class="sort-label">
+              <span>Sort by</span>
+              <select id="sortSelect">
+                <option value="set-az">Set (A → Z)</option>
+                <option value="name-az">Name (A → Z)</option>
+                <option value="price-low-high">Price (low → high)</option>
+                <option value="price-high-low">Price (high → low)</option>
+                <option value="updated-newest">Recently updated</option>
+              </select>
+            </label>
+            <div id="lastUpdated">Prices last refreshed: N/A</div>
+          </div>
         </section>
 
         <section id="productsGrid"></section>
@@ -43,6 +87,19 @@
           No products are currently available. Please check back later.
         </p>
       </main>
+
+      <footer class="app-footer">
+        <p>
+          Updated automatically using JustTCG · Built by Brandon ·
+          <a
+            href="https://discord.gg/sqXVguMCyv"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Join the Discord
+          </a>
+        </p>
+      </footer>
     </div>
 
     <script src="/main.js"></script>

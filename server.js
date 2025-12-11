@@ -116,6 +116,7 @@ app.get("/api/inventory", (req, res) => {
       ? `https://www.tcgplayer.com/product/${item.tcgPlayerId}`
       : null,
     imageUrl: item.imageUrl || null,
+    game: item.game || null,
   }));
 
   mapped.sort((a, b) => {
@@ -174,11 +175,29 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
     const nameRaw = row.name || "";
     const idRaw = row.tcgPlayerId || "";
     const qtyRaw = row.quantity;
+    const gameRaw = (row.game || "").trim().toLowerCase();
 
     const name = nameRaw.trim();
     const tcgId = String(idRaw).trim();
     let quantity = Number(qtyRaw);
     if (!Number.isFinite(quantity) || quantity < 0) quantity = 0;
+
+    // Normalize game field (we'll store simple keys)
+    let game = null;
+    if (gameRaw === "pokemon" || gameRaw === "pokémon" || gameRaw === "poke") {
+      game = "pokemon";
+    } else if (
+      gameRaw === "magic" ||
+      gameRaw === "mtg" ||
+      gameRaw === "magic: the gathering"
+    ) {
+      game = "mtg";
+    } else if (gameRaw === "other" || gameRaw === "misc") {
+      game = "other";
+    } else if (gameRaw) {
+      // Store whatever they typed if it's not empty
+      game = gameRaw;
+    }
 
     // Skip rows that are effectively empty
     if (!name && !tcgId) continue;
@@ -194,6 +213,7 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
         name: name || existing.name,
         tcgPlayerId: tcgId || existing.tcgPlayerId,
         quantity,
+        game: game !== null ? game : existing.game || null,
       };
       nextInventory.push(updated);
 
@@ -209,6 +229,7 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
         yourPrice: null,
         imageUrl: null,
         lastUpdated: null,
+        game: game || null,
       };
       nextInventory.push(fresh);
       newItems.push(fresh);
@@ -225,7 +246,8 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
       const base = item.name || "Unnamed product";
       const idPart = item.tcgPlayerId ? ` [${item.tcgPlayerId}]` : "";
       const qtyPart = ` x${item.quantity ?? 0}`;
-      return `• ${base}${idPart}${qtyPart}`;
+      const gamePart = item.game ? ` (${item.game})` : "";
+      return `• ${base}${idPart}${qtyPart}${gamePart}`;
     });
     let body = lines.join("\n");
     if (body.length > 1800) {
@@ -241,6 +263,7 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
       name: i.name,
       tcgPlayerId: i.tcgPlayerId,
       quantity: i.quantity,
+      game: i.game || null,
     })),
   });
 });

@@ -1,58 +1,74 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="utf-8" />
     <title>Admin – Sealed Inventory</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header class="site-header">
-      <div class="header-inner">
-        <h1>Admin – Sealed Inventory</h1>
-        <p class="subtitle">
-          Add or edit your products using simple fields. No JSON needed.
-        </p>
-      </div>
-    </header>
+    <div class="app-root">
+      <header class="app-header">
+        <div class="app-header-inner">
+          <div class="logo-pill">
+            <span class="logo-dot"></span>
+            <span class="logo-text">RPE</span>
+          </div>
+          <div class="hero-text">
+            <h1 class="page-title">Admin – Inventory Editor</h1>
+            <p class="page-subtitle">
+              Edit sealed inventory, TCGplayer IDs, quantity, and game type.
+            </p>
+          </div>
+        </div>
+      </header>
 
-    <main class="content">
-      <section class="admin-panel">
-        <div class="admin-controls">
-          <button id="loadCurrentBtn">Load current inventory</button>
-          <button id="addRowBtn">Add empty row</button>
-          <button id="saveBtn" class="primary-btn">Save Inventory</button>
+      <main>
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <button id="loadCurrentBtn" class="button" type="button">
+              Load current inventory
+            </button>
+            <button id="addRowBtn" class="button" type="button">
+              Add row
+            </button>
+            <button id="saveBtn" class="button" type="button">
+              Save changes
+            </button>
+          </div>
+          <div class="toolbar-right">
+            <span id="adminStatus" class="status-message"></span>
+          </div>
         </div>
 
-        <div class="table-wrapper">
-          <table class="inventory-table">
-            <thead>
-              <tr>
-                <th style="width: 45%;">Product name</th>
-                <th style="width: 25%;">TCGplayer ID</th>
-                <th style="width: 15%;">Quantity</th>
-                <th style="width: 15%;">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="inventoryBody">
-              <!-- Rows added by admin.js -->
-            </tbody>
-          </table>
-        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Product name</th>
+              <th>TCGplayer ID</th>
+              <th>Quantity</th>
+              <th>Game</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryBody"></tbody>
+        </table>
+      </main>
 
-        <p class="hint">
-          <strong>Tip:</strong> The TCGplayer ID is the number in the product URL,
-          e.g. <code>https://www.tcgplayer.com/product/624679/...</code> → <code>624679</code>.
+      <footer class="app-footer">
+        <p>
+          Admin panel · Changes save to inventory.json ·
+          <a
+            href="https://discord.gg/sqXVguMCyv"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Join the Discord
+          </a>
         </p>
+      </footer>
+    </div>
 
-        <p id="adminStatus" class="status-message"></p>
-      </section>
-    </main>
-
-    <footer class="site-footer">
-      <p>Changes overwrite <code>inventory.json</code> on the server.</p>
-    </footer>
-
-    <script src="admin.js"></script>
+    <script src="/admin.js"></script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-// admin.js – table UI, no JSON editing
+// admin.js – table UI with name / id / quantity / game
 
 const bodyEl = document.getElementById("inventoryBody");
 const statusEl = document.getElementById("adminStatus");
@@ -7,6 +7,7 @@ const addRowBtn = document.getElementById("addRowBtn");
 const saveBtn = document.getElementById("saveBtn");
 
 function setStatus(message, type) {
+  if (!statusEl) return;
   statusEl.textContent = message || "";
   statusEl.className = "status-message" + (type ? " " + type : "");
 }
@@ -15,6 +16,7 @@ function setStatus(message, type) {
 function createRow(item = {}) {
   const tr = document.createElement("tr");
 
+  // Name
   const nameTd = document.createElement("td");
   const nameInput = document.createElement("input");
   nameInput.type = "text";
@@ -22,6 +24,7 @@ function createRow(item = {}) {
   nameInput.value = item.name || "";
   nameTd.appendChild(nameInput);
 
+  // TCGplayer ID
   const idTd = document.createElement("td");
   const idInput = document.createElement("input");
   idInput.type = "text";
@@ -29,6 +32,7 @@ function createRow(item = {}) {
   idInput.value = item.tcgPlayerId || "";
   idTd.appendChild(idInput);
 
+  // Quantity
   const qtyTd = document.createElement("td");
   const qtyInput = document.createElement("input");
   qtyInput.type = "number";
@@ -45,6 +49,38 @@ function createRow(item = {}) {
   }
   qtyTd.appendChild(qtyInput);
 
+  // Game select
+  const gameTd = document.createElement("td");
+  const gameSelect = document.createElement("select");
+
+  const options = [
+    { value: "", label: "Auto-detect" },
+    { value: "pokemon", label: "Pokémon" },
+    { value: "mtg", label: "Magic: The Gathering" },
+    { value: "other", label: "Other" },
+  ];
+
+  options.forEach((opt) => {
+    const o = document.createElement("option");
+    o.value = opt.value;
+    o.textContent = opt.label;
+    gameSelect.appendChild(o);
+  });
+
+  const currentGame = (item.game || "").toLowerCase();
+  if (currentGame === "pokemon") {
+    gameSelect.value = "pokemon";
+  } else if (currentGame === "mtg" || currentGame === "magic") {
+    gameSelect.value = "mtg";
+  } else if (currentGame === "other") {
+    gameSelect.value = "other";
+  } else {
+    gameSelect.value = "";
+  }
+
+  gameTd.appendChild(gameSelect);
+
+  // Actions
   const actionsTd = document.createElement("td");
   const removeBtn = document.createElement("button");
   removeBtn.type = "button";
@@ -57,6 +93,7 @@ function createRow(item = {}) {
   tr.appendChild(nameTd);
   tr.appendChild(idTd);
   tr.appendChild(qtyTd);
+  tr.appendChild(gameTd);
   tr.appendChild(actionsTd);
 
   return tr;
@@ -79,7 +116,6 @@ async function loadCurrentInventory() {
 
     if (!items.length) {
       setStatus("No items yet – start adding some.", "");
-      // Add one empty row for convenience
       bodyEl.appendChild(createRow());
       return;
     }
@@ -108,14 +144,16 @@ async function saveInventory() {
 
   rows.forEach((row) => {
     const inputs = row.querySelectorAll("input");
+    const select = row.querySelector("select");
     if (inputs.length < 3) return;
 
     const name = inputs[0].value.trim();
     const tcgPlayerId = inputs[1].value.trim();
     const qtyRaw = inputs[2].value.trim();
+    const game = select ? select.value.trim() : "";
 
     // Skip completely empty rows
-    if (!name && !tcgPlayerId && !qtyRaw) {
+    if (!name && !tcgPlayerId && !qtyRaw && !game) {
       return;
     }
 
@@ -133,6 +171,7 @@ async function saveInventory() {
       name: name || "Unnamed product",
       tcgPlayerId,
       quantity,
+      game: game || null,
     });
   });
 
