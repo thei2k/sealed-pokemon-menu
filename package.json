@@ -1,17 +1,29 @@
 {
   "name": "sealed-pokemon-menu",
   "version": "1.0.0",
+  "description": "Sealed product inventory site + Discord price tracking bot",
   "main": "server.js",
+  "type": "commonjs",
+
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "bot": "node discordBot.js",
+    "dev": "nodemon server.js",
+    "bot-dev": "nodemon discordBot.js"
   },
+
   "dependencies": {
+    "discord.js": "^14.25.1",
     "dotenv": "^16.6.1",
-    "express": "^4.22.1"
+    "express": "^4.22.1",
+    "node-cron": "^4.2.1"
   },
-  "description": "",
+
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+  "license": "ISC"
 }
