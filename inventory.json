@@ -1,14 +1,135 @@
 [
   {
-    "name": "vatar: The Last Airbender - Collector Booster Display",
+    "name": "Avatar: The Last Airbender - Beginner Box",
     "setName": "Avatar: The Last Airbender",
     "quantity": 1,
-    "marketPrice": 374.7,
-    "yourPrice": 337.23,
-    "lastUpdated": "2025-12-11T02:02:17.884Z",
-    "tcgPlayerId": "648650",
-    "tcgPlayerUrl": "https://www.tcgplayer.com/product/648650",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648650.jpg"
+    "marketPrice": 27.28,
+    "yourPrice": 24.55,
+    "lastUpdated": "2025-12-11T04:29:00.485Z",
+    "tcgPlayerId": "648682",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/648682",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648682.jpg",
+    "game": null
+  },
+  {
+    "name": "Avatar: The Last Airbender - Jumpstart Booster Display",
+    "setName": "Avatar: The Last Airbender",
+    "quantity": 1,
+    "marketPrice": 100.4,
+    "yourPrice": 90.36,
+    "lastUpdated": "2025-12-11T04:29:00.485Z",
+    "tcgPlayerId": "648679",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/648679",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648679.jpg",
+    "game": null
+  },
+  {
+    "name": "Avatar: The Last Airbender - Play Booster Display",
+    "setName": "Avatar: The Last Airbender",
+    "quantity": 1,
+    "marketPrice": 148.53,
+    "yourPrice": 133.68,
+    "lastUpdated": "2025-12-11T04:29:00.484Z",
+    "tcgPlayerId": "648643",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/648643",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648643.jpg",
+    "game": null
+  },
+  {
+    "name": "Avatar: The Last Airbender - Scene Box (Tea Time at the Jasmine Dragon)",
+    "setName": "Avatar: The Last Airbender",
+    "quantity": 1,
+    "marketPrice": 53.62,
+    "yourPrice": 48.26,
+    "lastUpdated": "2025-12-11T04:29:00.486Z",
+    "tcgPlayerId": "648716",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/648716",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648716.jpg",
+    "game": null
+  },
+  {
+    "name": "ex Battle Deck [Kangaskhan ex] - Miscellaneous Cards & Products",
+    "setName": "Miscellaneous Cards & Products",
+    "quantity": 1,
+    "marketPrice": 9.6,
+    "yourPrice": 8.64,
+    "lastUpdated": "2025-12-11T04:29:00.482Z",
+    "tcgPlayerId": "527674",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/527674",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/527674.jpg",
+    "game": null
+  },
+  {
+    "name": "First Partner Pack (Alola)",
+    "setName": "First Partner Pack",
+    "quantity": 2,
+    "marketPrice": 18.19,
+    "yourPrice": 16.37,
+    "lastUpdated": "2025-12-11T04:29:00.480Z",
+    "tcgPlayerId": "231300",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/231300",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/231300.jpg",
+    "game": null
+  },
+  {
+    "name": "First Partner Pack (Sinnoh)",
+    "setName": "First Partner Pack",
+    "quantity": 2,
+    "marketPrice": 16.76,
+    "yourPrice": 15.08,
+    "lastUpdated": "2025-12-11T04:29:00.481Z",
+    "tcgPlayerId": "231303",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/231303",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/231303.jpg",
+    "game": null
+  },
+  {
+    "name": "Marvel's Spider-Man - Bundle - Marvel's Spider-Man",
+    "setName": "Marvel's Spider-Man",
+    "quantity": 1,
+    "marketPrice": 47.35,
+    "yourPrice": 42.62,
+    "lastUpdated": "2025-12-11T04:29:00.483Z",
+    "tcgPlayerId": "621115",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/621115",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/621115.jpg",
+    "game": null
+  },
+  {
+    "name": "Marvel's Spider-Man - Gift Bundle - Marvel's Spider-Man",
+    "setName": "Marvel's Spider-Man",
+    "quantity": 5,
+    "marketPrice": 66.91,
+    "yourPrice": 60.22,
+    "lastUpdated": "2025-12-11T04:29:00.484Z",
+    "tcgPlayerId": "648457",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/648457",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648457.jpg",
+    "game": null
+  },
+  {
+    "name": "Secret Lair Drop: Summer Superdrop 2025 - The Art of Frank Frazetta: The Second Exhibition (Non-Foil Edition)",
+    "setName": "Secret Lair Drop Series",
+    "quantity": 1,
+    "marketPrice": 38.44,
+    "yourPrice": 34.6,
+    "lastUpdated": "2025-12-11T04:29:00.483Z",
+    "tcgPlayerId": "637670",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/637670",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/637670.jpg",
+    "game": null
+  },
+  {
+    "name": "Secret Lair Drop: Summer Superdrop 2025 - The Art of Frank Frazetta: The Second Exhibition (Rainbow Foil Edition)",
+    "setName": "Secret Lair Drop Series",
+    "quantity": 1,
+    "marketPrice": 39.6,
+    "yourPrice": 35.64,
+    "lastUpdated": "2025-12-11T04:29:00.484Z",
+    "tcgPlayerId": "637671",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/637671",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/637671.jpg",
+    "game": null
   },
   {
     "name": "Duskmourn: House of Horror Commander Deck - Endless Punishment",
@@ -19,7 +140,8 @@
     "lastUpdated": "2025-12-11T02:02:17.882Z",
     "tcgPlayerId": "557256",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/557256",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/557256.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/557256.jpg",
+    "game": null
   },
   {
     "name": "Modern Horizons 3 Commander Deck Display",
@@ -30,7 +152,8 @@
     "lastUpdated": "2025-12-11T02:02:17.881Z",
     "tcgPlayerId": "541196",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/541196",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/541196.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/541196.jpg",
+    "game": null
   },
   {
     "name": "Marvel's Spider-Man - Collector Booster Display",
@@ -41,7 +164,8 @@
     "lastUpdated": "2025-12-11T02:02:17.884Z",
     "tcgPlayerId": "621110",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/621110",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/621110.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/621110.jpg",
+    "game": null
   },
   {
     "name": "Mega Evolution Booster Bundle",
@@ -52,7 +176,8 @@
     "lastUpdated": "2025-12-11T00:11:48.390Z",
     "tcgPlayerId": "644362",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/644362",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644362.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644362.jpg",
+    "game": null
   },
   {
     "name": "Mega Evolution Elite Trainer Box [Mega Gardevoir]",
@@ -63,7 +188,8 @@
     "lastUpdated": "2025-12-11T00:19:01.641Z",
     "tcgPlayerId": "644279",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/644279",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644279.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644279.jpg",
+    "game": null
   },
   {
     "name": "Mega Evolution Enhanced Booster Box",
@@ -74,7 +200,8 @@
     "lastUpdated": "2025-12-11T00:10:43.075Z",
     "tcgPlayerId": "644300",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/644300",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644300.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644300.jpg",
+    "game": null
   },
   {
     "name": "Mega Evolution Pokemon Center Elite Trainer Box (Exclusive) [Mega Gardevoir]",
@@ -85,7 +212,8 @@
     "lastUpdated": "2025-12-11T00:10:45.341Z",
     "tcgPlayerId": "648415",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/648415",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648415.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648415.jpg",
+    "game": null
   },
   {
     "name": "Mega Evolution Pokemon Center Elite Trainer Box (Exclusive) [Mega Lucario]",
@@ -96,7 +224,8 @@
     "lastUpdated": "2025-12-11T00:10:44.662Z",
     "tcgPlayerId": "644282",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/644282",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644282.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644282.jpg",
+    "game": null
   },
   {
     "name": "Mega Evolution Sleeved Booster Pack",
@@ -107,7 +236,8 @@
     "lastUpdated": "2025-12-11T00:19:01.641Z",
     "tcgPlayerId": "644354",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/644354",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644354.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644354.jpg",
+    "game": null
   },
   {
     "name": "Phantasmal Flames Booster Box",
@@ -118,7 +248,8 @@
     "lastUpdated": "2025-12-11T00:10:42.348Z",
     "tcgPlayerId": "654137",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/654137",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/654137.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/654137.jpg",
+    "game": null
   },
   {
     "name": "Phantasmal Flames Pokemon Center Elite Trainer Box (Exclusive)",
@@ -129,7 +260,8 @@
     "lastUpdated": "2025-12-11T00:10:43.944Z",
     "tcgPlayerId": "654135",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/654135",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/654135.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/654135.jpg",
+    "game": null
   },
   {
     "name": "Holiday Calendar 2025",
@@ -140,7 +272,8 @@
     "lastUpdated": "2025-12-11T00:19:01.640Z",
     "tcgPlayerId": "639828",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/639828",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/639828.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/639828.jpg",
+    "game": null
   },
   {
     "name": "Mega Latias ex Box",
@@ -151,7 +284,8 @@
     "lastUpdated": "2025-12-11T00:12:47.026Z",
     "tcgPlayerId": "654188",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/654188",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/654188.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/654188.jpg",
+    "game": null
   },
   {
     "name": "Ogerpon ex Premium Collection",
@@ -162,7 +296,8 @@
     "lastUpdated": "2025-12-11T00:19:01.639Z",
     "tcgPlayerId": "576482",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/576482",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/576482.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/576482.jpg",
+    "game": null
   },
   {
     "name": "Pokemon - Poke Ball Tin - Moon Ball (Q4 2024)",
@@ -173,7 +308,8 @@
     "lastUpdated": "2025-12-11T00:13:42.414Z",
     "tcgPlayerId": "587369",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/587369",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/587369.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/587369.jpg",
+    "game": null
   },
   {
     "name": "Pokemon - Poke Ball Tin - Poke Ball (Q4 2024)",
@@ -184,7 +320,8 @@
     "lastUpdated": "2025-12-11T00:12:49.284Z",
     "tcgPlayerId": "587365",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/587365",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/587365.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/587365.jpg",
+    "game": null
   },
   {
     "name": "Pokemon TCG: Trainer's Toolkit (2025)",
@@ -195,7 +332,8 @@
     "lastUpdated": "2025-12-11T02:02:17.884Z",
     "tcgPlayerId": "653203",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/653203",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/653203.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/653203.jpg",
+    "game": null
   },
   {
     "name": "Professor Juniper Premium Tournament Collection Box",
@@ -206,7 +344,8 @@
     "lastUpdated": "2025-12-11T00:11:43.854Z",
     "tcgPlayerId": "268713",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/268713",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/268713.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/268713.jpg",
+    "game": null
   },
   {
     "name": "Salamence ex & Reshiram ex Premium Collection",
@@ -217,7 +356,8 @@
     "lastUpdated": "2025-12-11T00:35:22.209Z",
     "tcgPlayerId": "653899",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/653899",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/653899.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/653899.jpg",
+    "game": null
   },
   {
     "name": "Scarlet & Violet Booster Pack",
@@ -228,7 +368,8 @@
     "lastUpdated": "2025-12-11T00:13:48.480Z",
     "tcgPlayerId": "476451",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/476451",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/476451.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/476451.jpg",
+    "game": null
   },
   {
     "name": "Paldea Evolved Booster Pack",
@@ -239,7 +380,8 @@
     "lastUpdated": "2025-12-11T00:13:44.798Z",
     "tcgPlayerId": "493976",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/493976",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/493976.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/493976.jpg",
+    "game": null
   },
   {
     "name": "Paradox Rift Build & Battle Box",
@@ -250,7 +392,8 @@
     "lastUpdated": "2025-12-11T00:12:46.330Z",
     "tcgPlayerId": "514068",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/514068",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/514068.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/514068.jpg",
+    "game": null
   },
   {
     "name": "Paradox Rift Sleeved Booster Pack",
@@ -261,7 +404,8 @@
     "lastUpdated": "2025-12-11T00:13:46.885Z",
     "tcgPlayerId": "517210",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/517210",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/517210.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/517210.jpg",
+    "game": null
   },
   {
     "name": "Temporal Forces Booster Pack",
@@ -272,7 +416,8 @@
     "lastUpdated": "2025-12-11T00:13:49.328Z",
     "tcgPlayerId": "532841",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/532841",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/532841.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/532841.jpg",
+    "game": null
   },
   {
     "name": "Twilight Masquerade Booster Pack",
@@ -283,7 +428,8 @@
     "lastUpdated": "2025-12-11T00:14:42.367Z",
     "tcgPlayerId": "543843",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/543843",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/543843.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/543843.jpg",
+    "game": null
   },
   {
     "name": "Twilight Masquerade Elite Trainer Box",
@@ -294,7 +440,8 @@
     "lastUpdated": "2025-12-11T00:11:45.254Z",
     "tcgPlayerId": "543845",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/543845",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/543845.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/543845.jpg",
+    "game": null
   },
   {
     "name": "Stellar Crown Booster Bundle",
@@ -305,7 +452,8 @@
     "lastUpdated": "2025-12-11T00:11:49.006Z",
     "tcgPlayerId": "557345",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/557345",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/557345.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/557345.jpg",
+    "game": null
   },
   {
     "name": "Stellar Crown Booster Pack",
@@ -316,7 +464,8 @@
     "lastUpdated": "2025-12-11T00:13:47.550Z",
     "tcgPlayerId": "557331",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/557331",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/557331.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/557331.jpg",
+    "game": null
   },
   {
     "name": "Surging Sparks Booster Bundle",
@@ -327,7 +476,8 @@
     "lastUpdated": "2025-12-11T00:19:01.638Z",
     "tcgPlayerId": "565629",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/565629",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/565629.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/565629.jpg",
+    "game": null
   },
   {
     "name": "Surging Sparks Elite Trainer Box",
@@ -338,7 +488,8 @@
     "lastUpdated": "2025-12-11T00:11:44.612Z",
     "tcgPlayerId": "565630",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/565630",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/565630.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/565630.jpg",
+    "game": null
   },
   {
     "name": "Destined Rivals Elite Trainer Box",
@@ -349,7 +500,8 @@
     "lastUpdated": "2025-12-11T00:10:47.583Z",
     "tcgPlayerId": "624676",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/624676",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/624676.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/624676.jpg",
+    "game": null
   },
   {
     "name": "Black Bolt Booster Bundle",
@@ -360,7 +512,8 @@
     "lastUpdated": "2025-12-11T00:11:46.902Z",
     "tcgPlayerId": "630431",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/630431",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630431.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630431.jpg",
+    "game": null
   },
   {
     "name": "Black Bolt Pokemon Center Elite Trainer Box (Exclusive)",
@@ -371,7 +524,8 @@
     "lastUpdated": "2025-12-11T00:10:46.162Z",
     "tcgPlayerId": "630687",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/630687",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630687.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630687.jpg",
+    "game": null
   },
   {
     "name": "Black Bolt Tech Sticker Collection",
@@ -382,7 +536,8 @@
     "lastUpdated": "2025-12-11T00:12:47.736Z",
     "tcgPlayerId": "630614",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/630614",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630614.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630614.jpg",
+    "game": null
   },
   {
     "name": "Unova Victini Illustration Collection",
@@ -393,7 +548,8 @@
     "lastUpdated": "2025-12-11T00:12:45.537Z",
     "tcgPlayerId": "630615",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/630615",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630615.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630615.jpg",
+    "game": null
   },
   {
     "name": "Paldean Fates Great Tusk ex & Iron Treads ex Premium Collection",
@@ -404,7 +560,8 @@
     "lastUpdated": "2025-12-11T00:14:43.310Z",
     "tcgPlayerId": "665113",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/665113",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/665113.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/665113.jpg",
+    "game": null
   },
   {
     "name": "Paldean Fates Tech Sticker Collection [Fidough]",
@@ -415,7 +572,8 @@
     "lastUpdated": "2025-12-11T00:59:04.065Z",
     "tcgPlayerId": "528043",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/528043",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/528043.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/528043.jpg",
+    "game": null
   },
   {
     "name": "Prismatic Evolutions Booster Bundle",
@@ -426,7 +584,8 @@
     "lastUpdated": "2025-12-11T00:11:45.864Z",
     "tcgPlayerId": "600518",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/600518",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/600518.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/600518.jpg",
+    "game": null
   },
   {
     "name": "Prismatic Evolutions Poster Collection",
@@ -437,7 +596,8 @@
     "lastUpdated": "2025-12-11T00:12:48.597Z",
     "tcgPlayerId": "593359",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/593359",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/593359.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/593359.jpg",
+    "game": null
   },
   {
     "name": "Prismatic Evolutions Surprise Box",
@@ -448,7 +608,8 @@
     "lastUpdated": "2025-12-11T00:12:42.953Z",
     "tcgPlayerId": "593466",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/593466",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/593466.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/593466.jpg",
+    "game": null
   },
   {
     "name": "White Flare Binder Collection",
@@ -459,7 +620,8 @@
     "lastUpdated": "2025-12-11T00:12:42.312Z",
     "tcgPlayerId": "630695",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/630695",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630695.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630695.jpg",
+    "game": null
   },
   {
     "name": "White Flare Booster Bundle",
@@ -470,7 +632,8 @@
     "lastUpdated": "2025-12-11T00:11:47.763Z",
     "tcgPlayerId": "630696",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/630696",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630696.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630696.jpg",
+    "game": null
   },
   {
     "name": "White Flare Pokemon Center Elite Trainer Box (Exclusive)",
@@ -481,7 +644,8 @@
     "lastUpdated": "2025-12-11T00:10:46.950Z",
     "tcgPlayerId": "630688",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/630688",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630688.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/630688.jpg",
+    "game": null
   },
   {
     "name": "Darkness Ablaze Booster Pack",
@@ -492,7 +656,8 @@
     "lastUpdated": "2025-12-11T00:19:01.637Z",
     "tcgPlayerId": "216852",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/216852",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/216852.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/216852.jpg",
+    "game": null
   },
   {
     "name": "Leafeon VSTAR Special Collection",
@@ -503,7 +668,8 @@
     "lastUpdated": "2025-12-11T00:10:48.744Z",
     "tcgPlayerId": "256147",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/256147",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/256147.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/256147.jpg",
+    "game": null
   },
   {
     "name": "Astral Radiance Sleeved Booster Pack",
@@ -514,7 +680,8 @@
     "lastUpdated": "2025-12-11T00:13:43.893Z",
     "tcgPlayerId": "265526",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/265526",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/265526.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/265526.jpg",
+    "game": null
   },
   {
     "name": "Silver Tempest Booster Pack",
@@ -525,6 +692,7 @@
     "lastUpdated": "2025-12-11T00:13:43.164Z",
     "tcgPlayerId": "283388",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/283388",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/283388.jpg"
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/283388.jpg",
+    "game": null
   }
 ]
