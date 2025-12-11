@@ -1,10 +1,15 @@
 // discordBot.js
-// Discord bot that lets users track TCGplayer IDs and get daily DM price updates.
+// Discord bot that lets users track TCGplayer IDs and get daily + on-demand DM price updates.
 
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
-const { Client, GatewayIntentBits, Partials } = require("discord.js");
+const {
+  Client,
+  GatewayIntentBits,
+  Partials,
+  PermissionsBitField,
+} = require("discord.js");
 const cron = require("node-cron");
 
 // ---- ENVIRONMENT ----
@@ -26,13 +31,24 @@ if (!JUSTTCG_API_KEY) {
 
 const PORTFOLIO_PATH = path.join(__dirname, "userPortfolios.json");
 const CMD_PREFIX = "!";
-const BATCH_SIZE = 20; // your plan limit
+const BATCH_SIZE = 20; // your JustTCG plan limit
+
+// ---- Cooldown Settings ----
+
+// 2 hours for normal users
+const ON_DEMAND_COOLDOWN_MS = 2 * 60 * 60 * 1000; // 2 hours
+const lastOnDemandRun = {}; // { userId: timestamp }
 
 // ---- DISCORD CLIENT ----
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.DirectMessages],
-  partials: [Partials.Channel]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
+  ],
+  partials: [Partials.Channel],
 });
 
 // ---- STORAGE HELPERS ----
@@ -62,12 +78,13 @@ async function fetchCardPrices(tcgplayerIds) {
   if (!tcgplayerIds.length) return {};
 
   const uniqueIds = Array.from(new Set(tcgplayerIds.map(String)));
-
   const idToPrice = {};
 
   for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
     const chunk = uniqueIds.slice(i, i + BATCH_SIZE);
-    console.log(`Fetching prices for batch ${i / BATCH_SIZE + 1}: ${chunk.length} IDs`);
+    console.log(
+      `Fetching prices for batch ${i / BATCH_SIZE + 1}: ${chunk.length} IDs`
+    );
 
     try {
       const res = await fetch("https://api.justtcg.com/v1/cards", {
@@ -91,7 +108,8 @@ async function fetchCardPrices(tcgplayerIds) {
       }
 
       for (const entry of data) {
-        if (!entry || !entry.tcgplayerId || !Array.isArray(entry.variants)) continue;
+        if (!entry || !entry.tcgplayerId || !Array.isArray(entry.variants))
+          continue;
 
         const sealedVariant = entry.variants.find(
           (v) =>
@@ -169,7 +187,7 @@ async function handleInventoryAdd(message, argsStr) {
     .join(", ");
 
   await message.reply(
-    `Added/updated the following in your watchlist: ${summary}`
+    `✅ Added/updated the following in your watchlist: ${summary}`
   );
 }
 
@@ -180,7 +198,7 @@ async function handleInventoryList(message) {
 
   if (!list.length) {
     return message.reply(
-      "You don't have anything in your watchlist yet. Add items with `!inventoryadd`."
+      "📭 You don't have anything in your watchlist yet. Add items with `!inventoryadd`."
     );
   }
 
@@ -200,14 +218,14 @@ async function handleInventoryList(message) {
   if (current) chunks.push(current);
 
   for (const chunk of chunks) {
-    await message.author.send(`Your watchlist:\n\n${chunk}`);
+    await message.author.send(`📋 Your watchlist:\n\n${chunk}`);
   }
 
   if (chunks.length === 1) {
-    await message.reply("I've sent your current watchlist via DM.");
+    await message.reply("✅ I've sent your current watchlist via DM.");
   } else {
     await message.reply(
-      `I've sent your current watchlist in ${chunks.length} DMs.`
+      `✅ I've sent your current watchlist in ${chunks.length} DMs.`
     );
   }
 }
@@ -228,8 +246,97 @@ async function handleInventoryRemove(message, argsStr) {
   savePortfolios(portfolios);
 
   await message.reply(
-    `If that ID was in your watchlist, it's been removed. You now have ${next.length} item(s).`
+    `🗑 If that ID was in your watchlist, it's been removed. You now have ${next.length} item(s).`
   );
+}
+
+// !inventorynow – on-demand price fetch for this user
+async function handleInventoryNow(message) {
+  const userId = message.author.id;
+  const now = Date.now();
+
+  // Determine if user is admin (server admin only)
+  const isAdmin =
+    message.member &&
+    message.member.permissions &&
+    message.member.permissions.has(PermissionsBitField.Flags.Administrator);
+
+  // Cooldown check (only applies to non-admins)
+  if (!isAdmin) {
+    const last = lastOnDemandRun[userId] || 0;
+    const diff = now - last;
+
+    if (diff < ON_DEMAND_COOLDOWN_MS) {
+      const remainingMs = ON_DEMAND_COOLDOWN_MS - diff;
+      const remainingMin = Math.ceil(remainingMs / 60000);
+      return message.reply(
+        `⏳ You can only use \`!inventorynow\` every 2 hours. Please try again in ~${remainingMin} minute(s).`
+      );
+    }
+
+    // Update normal-user cooldown
+    lastOnDemandRun[userId] = now;
+  }
+
+  // Load user's watchlist
+  const portfolios = loadPortfolios();
+  const list = portfolios[userId] || [];
+
+  if (!list.length) {
+    return message.reply(
+      "📭 Your watchlist is empty. Add items first with `!inventoryadd`."
+    );
+  }
+
+  await message.reply("📡 Fetching the latest live prices…");
+
+  const ids = list.map((e) => String(e.tcgplayerId));
+  const idToPrice = await fetchCardPrices(ids);
+
+  const lines = list.map((entry) => {
+    const info = idToPrice[String(entry.tcgplayerId)] || {};
+    const price = info.marketPrice;
+    const setName = info.setName || "";
+    const name = info.name || "";
+    const label = entry.label || name || entry.tcgplayerId;
+
+    const priceText =
+      typeof price === "number" ? `$${price.toFixed(2)}` : "N/A";
+
+    return `• **${label}** (${entry.tcgplayerId}) — ${priceText}${
+      setName ? ` [${setName}]` : ""
+    }`;
+  });
+
+  try {
+    const user = await client.users.fetch(userId);
+
+    let header = "📊 **Your latest TCG price updates:**\n\n";
+    let messageText = header;
+
+    for (const line of lines) {
+      if ((messageText + line + "\n").length > 1800) {
+        await user.send(messageText);
+        messageText = header;
+      }
+      messageText += line + "\n";
+    }
+
+    if (messageText !== header) {
+      await user.send(messageText);
+    }
+
+    if (isAdmin) {
+      await message.reply("✅ Admin override used. Latest prices sent via DM.");
+    } else {
+      await message.reply("📬 I’ve sent you your updated prices in DM!");
+    }
+  } catch (err) {
+    console.error("Failed to DM user for inventorynow:", err.message || err);
+    await message.reply(
+      "⚠ I couldn't DM you. Make sure your DMs are open so I can send updates."
+    );
+  }
 }
 
 // ---- DAILY JOB ----
@@ -274,7 +381,7 @@ async function sendDailyUpdates() {
     const priceText =
       typeof price === "number" ? `$${price.toFixed(2)}` : "N/A";
 
-    const line = `• ${label} (${entry.tcgplayerId}) – ${priceText}${
+    const line = `• ${label} (${entry.tcgplayerId}) — ${priceText}${
       setName ? ` [${setName}]` : ""
     }`;
 
@@ -288,7 +395,7 @@ async function sendDailyUpdates() {
       const user = await client.users.fetch(userId);
       const lines = perUserLines[userId];
 
-      let header = "Here are today's price updates for your watchlist:\n\n";
+      let header = "📊 **Today's price updates for your watchlist:**\n\n";
       let messageText = header;
 
       for (const line of lines) {
@@ -341,16 +448,19 @@ client.on("messageCreate", async (message) => {
       await handleInventoryList(message);
     } else if (cmd === "inventoryremove") {
       await handleInventoryRemove(message, argsStr);
+    } else if (cmd === "inventorynow") {
+      await handleInventoryNow(message);
     }
   } catch (err) {
     console.error("Command error:", err.message || err);
-    message.reply("Something went wrong handling that command.");
+    message.reply("❌ Something went wrong handling that command.");
   }
 });
 
 // ---- LOGIN ----
 
-client.once("ready", () => {
+// Use clientReady to avoid the deprecation warning about "ready"
+client.once("clientReady", () => {
   console.log(`Bot logged in as ${client.user.tag}`);
   console.log("Daily job scheduled at 10:00.");
 });
