@@ -9,7 +9,7 @@
     "tcgPlayerId": "648682",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/648682",
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648682.jpg",
-    "game": null
+    "game": "mtg"
   },
   {
     "name": "Avatar: The Last Airbender - Jumpstart Booster Display",
@@ -21,7 +21,7 @@
     "tcgPlayerId": "648679",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/648679",
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648679.jpg",
-    "game": null
+    "game": "mtg"
   },
   {
     "name": "Avatar: The Last Airbender - Play Booster Display",
@@ -33,7 +33,7 @@
     "tcgPlayerId": "648643",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/648643",
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648643.jpg",
-    "game": null
+    "game": "mtg"
   },
   {
     "name": "Avatar: The Last Airbender - Scene Box (Tea Time at the Jasmine Dragon)",
@@ -45,91 +45,7 @@
     "tcgPlayerId": "648716",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/648716",
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648716.jpg",
-    "game": null
-  },
-  {
-    "name": "ex Battle Deck [Kangaskhan ex] - Miscellaneous Cards & Products",
-    "setName": "Miscellaneous Cards & Products",
-    "quantity": 1,
-    "marketPrice": 9.6,
-    "yourPrice": 8.64,
-    "lastUpdated": "2025-12-11T04:29:00.482Z",
-    "tcgPlayerId": "527674",
-    "tcgPlayerUrl": "https://www.tcgplayer.com/product/527674",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/527674.jpg",
-    "game": null
-  },
-  {
-    "name": "First Partner Pack (Alola)",
-    "setName": "First Partner Pack",
-    "quantity": 2,
-    "marketPrice": 18.19,
-    "yourPrice": 16.37,
-    "lastUpdated": "2025-12-11T04:29:00.480Z",
-    "tcgPlayerId": "231300",
-    "tcgPlayerUrl": "https://www.tcgplayer.com/product/231300",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/231300.jpg",
-    "game": null
-  },
-  {
-    "name": "First Partner Pack (Sinnoh)",
-    "setName": "First Partner Pack",
-    "quantity": 2,
-    "marketPrice": 16.76,
-    "yourPrice": 15.08,
-    "lastUpdated": "2025-12-11T04:29:00.481Z",
-    "tcgPlayerId": "231303",
-    "tcgPlayerUrl": "https://www.tcgplayer.com/product/231303",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/231303.jpg",
-    "game": null
-  },
-  {
-    "name": "Marvel's Spider-Man - Bundle - Marvel's Spider-Man",
-    "setName": "Marvel's Spider-Man",
-    "quantity": 1,
-    "marketPrice": 47.35,
-    "yourPrice": 42.62,
-    "lastUpdated": "2025-12-11T04:29:00.483Z",
-    "tcgPlayerId": "621115",
-    "tcgPlayerUrl": "https://www.tcgplayer.com/product/621115",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/621115.jpg",
-    "game": null
-  },
-  {
-    "name": "Marvel's Spider-Man - Gift Bundle - Marvel's Spider-Man",
-    "setName": "Marvel's Spider-Man",
-    "quantity": 5,
-    "marketPrice": 66.91,
-    "yourPrice": 60.22,
-    "lastUpdated": "2025-12-11T04:29:00.484Z",
-    "tcgPlayerId": "648457",
-    "tcgPlayerUrl": "https://www.tcgplayer.com/product/648457",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648457.jpg",
-    "game": null
-  },
-  {
-    "name": "Secret Lair Drop: Summer Superdrop 2025 - The Art of Frank Frazetta: The Second Exhibition (Non-Foil Edition)",
-    "setName": "Secret Lair Drop Series",
-    "quantity": 1,
-    "marketPrice": 38.44,
-    "yourPrice": 34.6,
-    "lastUpdated": "2025-12-11T04:29:00.483Z",
-    "tcgPlayerId": "637670",
-    "tcgPlayerUrl": "https://www.tcgplayer.com/product/637670",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/637670.jpg",
-    "game": null
-  },
-  {
-    "name": "Secret Lair Drop: Summer Superdrop 2025 - The Art of Frank Frazetta: The Second Exhibition (Rainbow Foil Edition)",
-    "setName": "Secret Lair Drop Series",
-    "quantity": 1,
-    "marketPrice": 39.6,
-    "yourPrice": 35.64,
-    "lastUpdated": "2025-12-11T04:29:00.484Z",
-    "tcgPlayerId": "637671",
-    "tcgPlayerUrl": "https://www.tcgplayer.com/product/637671",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/637671.jpg",
-    "game": null
+    "game": "mtg"
   },
   {
     "name": "Duskmourn: House of Horror Commander Deck - Endless Punishment",
@@ -141,7 +57,7 @@
     "tcgPlayerId": "557256",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/557256",
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/557256.jpg",
-    "game": null
+    "game": "mtg"
   },
   {
     "name": "Modern Horizons 3 Commander Deck Display",
@@ -153,7 +69,43 @@
     "tcgPlayerId": "541196",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/541196",
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/541196.jpg",
-    "game": null
+    "game": "mtg"
+  },
+  {
+    "name": "First Partner Pack (Alola)",
+    "setName": "First Partner Pack",
+    "quantity": 2,
+    "marketPrice": 18.19,
+    "yourPrice": 16.37,
+    "lastUpdated": "2025-12-11T04:29:00.480Z",
+    "tcgPlayerId": "231300",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/231300",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/231300.jpg",
+    "game": "pokemon"
+  },
+  {
+    "name": "First Partner Pack (Sinnoh)",
+    "setName": "First Partner Pack",
+    "quantity": 2,
+    "marketPrice": 16.76,
+    "yourPrice": 15.08,
+    "lastUpdated": "2025-12-11T04:29:00.481Z",
+    "tcgPlayerId": "231303",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/231303",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/231303.jpg",
+    "game": "pokemon"
+  },
+  {
+    "name": "Marvel's Spider-Man - Bundle - Marvel's Spider-Man",
+    "setName": "Marvel's Spider-Man",
+    "quantity": 1,
+    "marketPrice": 47.35,
+    "yourPrice": 42.62,
+    "lastUpdated": "2025-12-11T04:29:00.483Z",
+    "tcgPlayerId": "621115",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/621115",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/621115.jpg",
+    "game": "mtg"
   },
   {
     "name": "Marvel's Spider-Man - Collector Booster Display",
@@ -165,7 +117,19 @@
     "tcgPlayerId": "621110",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/621110",
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/621110.jpg",
-    "game": null
+    "game": "mtg"
+  },
+  {
+    "name": "Marvel's Spider-Man - Gift Bundle - Marvel's Spider-Man",
+    "setName": "Marvel's Spider-Man",
+    "quantity": 5,
+    "marketPrice": 66.91,
+    "yourPrice": 60.22,
+    "lastUpdated": "2025-12-11T04:29:00.484Z",
+    "tcgPlayerId": "648457",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/648457",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648457.jpg",
+    "game": "mtg"
   },
   {
     "name": "Mega Evolution Booster Bundle",
@@ -264,6 +228,18 @@
     "game": null
   },
   {
+    "name": "ex Battle Deck [Kangaskhan ex] - Miscellaneous Cards & Products",
+    "setName": "Miscellaneous Cards & Products",
+    "quantity": 1,
+    "marketPrice": 9.6,
+    "yourPrice": 8.64,
+    "lastUpdated": "2025-12-11T04:29:00.482Z",
+    "tcgPlayerId": "527674",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/527674",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/527674.jpg",
+    "game": "pokemon"
+  },
+  {
     "name": "Holiday Calendar 2025",
     "setName": "Miscellaneous Cards & Products",
     "quantity": 5,
@@ -358,6 +334,30 @@
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/653899",
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/653899.jpg",
     "game": null
+  },
+  {
+    "name": "Secret Lair Drop: Summer Superdrop 2025 - The Art of Frank Frazetta: The Second Exhibition (Non-Foil Edition)",
+    "setName": "Secret Lair Drop Series",
+    "quantity": 1,
+    "marketPrice": 38.44,
+    "yourPrice": 34.6,
+    "lastUpdated": "2025-12-11T04:29:00.483Z",
+    "tcgPlayerId": "637670",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/637670",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/637670.jpg",
+    "game": "mtg"
+  },
+  {
+    "name": "Secret Lair Drop: Summer Superdrop 2025 - The Art of Frank Frazetta: The Second Exhibition (Rainbow Foil Edition)",
+    "setName": "Secret Lair Drop Series",
+    "quantity": 1,
+    "marketPrice": 39.6,
+    "yourPrice": 35.64,
+    "lastUpdated": "2025-12-11T04:29:00.484Z",
+    "tcgPlayerId": "637671",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/637671",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/637671.jpg",
+    "game": "mtg"
   },
   {
     "name": "Scarlet & Violet Booster Pack",
