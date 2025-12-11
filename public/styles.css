@@ -1,15 +1,4 @@
-:root {
-  --bg: #050816;
-  --card-bg: #0b1020;
-  --accent: #f97316;
-  --accent-soft: rgba(249, 115, 22, 0.1);
-  --text: #f9fafb;
-  --muted: #9ca3af;
-  --border: #1f2933;
-  --danger: #f87171;
-  --radius-lg: 1.25rem;
-  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.4);
-}
+/* ---------- Base layout ---------- */
 
 *,
 *::before,
@@ -17,374 +6,292 @@
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-    "Segoe UI", sans-serif;
-  background: radial-gradient(circle at top, #111827 0, #020617 45%, #000 100%);
-  color: var(--text);
-  min-height: 100vh;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: radial-gradient(circle at top, #e5f0ff 0, #f3f4f6 45%, #f9fafb 100%);
+  color: #111827;
+}
+
+/* Centered content column */
+
+main {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+}
+
+/* ---------- Header / top bar ---------- */
+
+.page-header {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
 }
 
-/* Header */
-
-.site-header {
-  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
-  background: linear-gradient(
-    to right,
-    rgba(15, 23, 42, 0.95),
-    rgba(3, 7, 18, 0.95)
-  );
-  backdrop-filter: blur(16px);
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #0f172a;
 }
 
-.header-inner {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem;
-}
-
-.header-inner h1 {
-  margin: 0;
-  font-size: 1.9rem;
-  letter-spacing: 0.03em;
-}
-
-.subtitle {
-  margin: 0.35rem 0 0;
-  color: var(--muted);
+.page-subtitle {
   font-size: 0.95rem;
+  color: #6b7280;
 }
 
-/* Layout */
+@media (min-width: 768px) {
+  .page-header {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
 
-.content {
-  max-width: 1100px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 1.5rem 1rem 2rem;
-  flex: 1;
+  .page-title {
+    font-size: 2rem;
+  }
 }
 
-/* Toolbar */
+/* ---------- Toolbar: search + last updated ---------- */
 
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
   align-items: center;
-  margin-bottom: 1.5rem;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
 #searchInput {
   flex: 1 1 220px;
-  padding: 0.7rem 0.9rem;
+  min-width: 0;
+  padding: 10px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.5);
-  background: rgba(15, 23, 42, 0.9);
-  color: var(--text);
-  outline: none;
+  border: 1px solid #d1d5db;
+  background-color: rgba(255, 255, 255, 0.9);
   font-size: 0.95rem;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease,
+    background-color 120ms ease;
 }
 
 #searchInput::placeholder {
-  color: rgba(148, 163, 184, 0.9);
+  color: #9ca3af;
 }
 
 #searchInput:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.6);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+  background-color: #ffffff;
 }
 
-.last-updated {
-  font-size: 0.8rem;
-  color: var(--muted);
+#lastUpdated {
+  font-size: 0.85rem;
+  color: #6b7280;
 }
 
-/* Products grid */
+/* ---------- Products grid ---------- */
 
-.products-grid {
+#productsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 1.1rem;
-}
-
-.product-card {
-  background: linear-gradient(145deg, #020617, #020617);
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(31, 41, 55, 0.9);
-  box-shadow: var(--shadow-soft);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-.product-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    circle at top right,
-    rgba(249, 115, 22, 0.12),
-    transparent 60%
-  );
-  pointer-events: none;
-}
-
-.product-image-wrapper {
-  position: relative;
-  background: radial-gradient(circle at top, #111827, #020617);
-  padding: 0.75rem;
-}
-
-.product-image {
-  width: 100%;
-  height: 180px;
-  object-fit: contain;
-  display: block;
-  border-radius: 0.75rem;
-}
-
-.quantity-badge {
-  position: absolute;
-  top: 0.9rem;
-  left: 0.9rem;
-  background: rgba(15, 23, 42, 0.9);
-  border-radius: 999px;
-  padding: 0.25rem 0.6rem;
-  font-size: 0.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.8);
-}
-
-.product-body {
-  padding: 0.9rem 0.9rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  position: relative;
-  z-index: 1;
-}
-
-.product-name {
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.product-set {
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
-.price-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-top: 0.35rem;
-}
-
-.price-label {
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.price-value {
-  font-size: 1.05rem;
-  font-weight: 600;
-}
-
-.price-your {
-  color: var(--accent);
-}
-
-.price-market {
-  font-size: 0.9rem;
-  color: var(--muted);
-}
-
-.product-footer {
-  margin-top: 0.45rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.tag-pill {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 0.18rem 0.5rem;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border: 1px solid rgba(249, 115, 22, 0.4);
-}
-
-.link {
-  font-size: 0.8rem;
-  color: var(--muted);
-  text-decoration: none;
-}
-
-.link:hover {
-  color: var(--accent);
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 18px;
 }
 
 /* Empty state */
 
-.empty-state {
-  margin-top: 2rem;
+#emptyState {
+  margin-top: 40px;
+  padding: 28px 20px;
+  border-radius: 16px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px dashed #d1d5db;
   text-align: center;
-  color: var(--muted);
+  color: #6b7280;
+  font-size: 0.95rem;
 }
 
-.empty-state.hidden {
+.hidden {
   display: none;
 }
 
-/* Admin styles */
+/* ---------- Product cards ---------- */
 
-.admin-panel {
-  background: rgba(15, 23, 42, 0.9);
-  border: 1px solid rgba(55, 65, 81, 0.9);
-  border-radius: var(--radius-lg);
-  padding: 1rem;
-  box-shadow: var(--shadow-soft);
-}
-
-.admin-controls {
+.product-card {
+  position: relative;
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 14px 16px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #ffffff, #f9fafb);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+  transition: transform 130ms ease, box-shadow 130ms ease,
+    background-color 130ms ease;
 }
 
-button,
-.primary-btn {
-  border: none;
-  border-radius: 999px;
-  padding: 0.5rem 0.9rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  background: rgba(31, 41, 55, 0.9);
-  color: var(--text);
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
 }
 
-button:hover,
-.primary-btn:hover {
-  background: rgba(55, 65, 81, 1);
-}
+/* ---------- Image treatment (fixes TCG white backgrounds) ---------- */
 
-.primary-btn {
-  margin-top: 0.75rem;
-  background: var(--accent);
-  color: #111827;
-  font-weight: 600;
-}
-
-.primary-btn:hover {
-  background: #fb923c;
-}
-
-#inventoryTextarea {
+.product-image {
   width: 100%;
-  min-height: 260px;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(55, 65, 81, 0.9);
-  background: #020617;
-  color: var(--text);
-  padding: 0.75rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    "Liberation Mono", "Courier New", monospace;
-  font-size: 0.85rem;
-  resize: vertical;
+  border-radius: 14px;
+  /* Soft "card" frame behind the image so TCG white background looks intentional */
+  background-color: #f9fafb;
+  padding: 8px;
+  object-fit: contain;
+  aspect-ratio: 1 / 1;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.03);
 }
+
+/* ---------- Text inside the card ---------- */
+
+.product-name {
+  margin: 4px 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.product-set {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+/* Price row */
+
+.product-price-row {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+.product-price-row span {
+  font-weight: 400;
+  color: #6b7280;
+}
+
+/* Meta: updated timestamp */
+
+.product-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #9ca3af;
+}
+
+/* TCGplayer link */
+
+.product-link {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.product-link::after {
+  content: "↗";
+  font-size: 0.8em;
+}
+
+.product-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Admin / status styles (used by admin.html) ---------- */
 
 .status-message {
-  margin-top: 0.5rem;
-  font-size: 0.85rem;
-}
-
-.status-message.error {
-  color: var(--danger);
+  margin-top: 10px;
+  font-size: 0.9rem;
 }
 
 .status-message.success {
-  color: #4ade80;
+  color: #15803d;
 }
 
-.hint {
-  font-size: 0.8rem;
-  color: var(--muted);
+.status-message.error {
+  color: #b91c1c;
 }
 
-.hint-block {
-  background: #020617;
-  border-radius: 0.75rem;
-  padding: 0.5rem 0.9rem;
-  font-size: 0.8rem;
-  border: 1px solid rgba(55, 65, 81, 0.9);
-}
+/* Basic table styling for admin page */
 
-/* Footer */
-
-.site-footer {
-  border-top: 1px solid rgba(15, 23, 42, 0.95);
-  padding: 0.75rem 1rem 1rem;
-  font-size: 0.8rem;
-  color: var(--muted);
-  text-align: center;
-}
-
-/* Responsive tweaks */
-
-@media (max-width: 640px) {
-  .header-inner h1 {
-    font-size: 1.5rem;
-  }
-}
-.table-wrapper {
-  margin-top: 0.75rem;
-  overflow-x: auto;
-}
-
-.inventory-table {
+.admin-table {
   width: 100%;
   border-collapse: collapse;
+  margin-top: 16px;
   font-size: 0.9rem;
 }
 
-.inventory-table th,
-.inventory-table td {
-  border-bottom: 1px solid rgba(55, 65, 81, 0.8);
-  padding: 0.4rem 0.5rem;
+.admin-table th,
+.admin-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.admin-table th {
   text-align: left;
-}
-
-.inventory-table th {
   font-weight: 600;
-  color: #e5e7eb;
-  background: rgba(15, 23, 42, 0.9);
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  color: #4b5563;
+  background-color: #f9fafb;
 }
 
-.admin-input {
+.admin-table input {
   width: 100%;
-  padding: 0.3rem 0.45rem;
-  border-radius: 0.4rem;
-  border: 1px solid rgba(75, 85, 99, 0.9);
-  background: #020617;
-  color: #f9fafb;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
   font-size: 0.85rem;
 }
 
-.admin-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.6);
+.admin-table button {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: none;
+  font-size: 0.8rem;
+  cursor: pointer;
+  background-color: #ef4444;
+  color: white;
 }
 
+.admin-table button:hover {
+  background-color: #dc2626;
+}
+
+/* ---------- Buttons (if you have any generic ones) ---------- */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: none;
+  background-color: #2563eb;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.button:hover {
+  background-color: #1d4ed8;
+}
