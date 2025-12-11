@@ -17,6 +17,91 @@ function formatCurrency(value) {
   return `$${value.toFixed(2)}`;
 }
 
+// Try to determine whether an item is Pokémon or Magic
+function detectGame(item) {
+  const rawGame =
+    (item.game || item.category || item.productType || "").toLowerCase();
+  const name = (item.name || "").toLowerCase();
+  const setName = (item.setName || "").toLowerCase();
+
+  // If we ever start storing it explicitly
+  if (rawGame.includes("magic")) return "mtg";
+  if (rawGame.includes("pok")) return "pokemon";
+
+  // Heuristics based on naming
+  if (
+    name.includes("magic: the gathering") ||
+    name.includes("mtg") ||
+    setName.includes("magic: the gathering")
+  ) {
+    return "mtg";
+  }
+
+  // Default to Pokémon for now (since that's most of your inventory)
+  return "pokemon";
+}
+
+// Create a single product card DOM element
+function createProductCard(item) {
+  const card = document.createElement("article");
+  card.className = "product-card";
+
+  const name = item.name || "Unnamed product";
+  const setName = item.setName || "";
+  const game = detectGame(item);
+
+  card.dataset.name = name.toLowerCase();
+  card.dataset.set = setName.toLowerCase();
+  card.dataset.game = game;
+
+  const img = document.createElement("img");
+  img.className = "product-image";
+  img.alt = name;
+  img.loading = "lazy";
+  if (item.imageUrl) {
+    img.src = item.imageUrl;
+  }
+
+  const nameEl = document.createElement("h2");
+  nameEl.className = "product-name";
+  nameEl.textContent = name;
+
+  const setEl = document.createElement("p");
+  setEl.className = "product-set";
+  setEl.textContent = setName;
+
+  const priceRow = document.createElement("p");
+  priceRow.className = "product-price-row";
+  const yourPrice = formatCurrency(item.yourPrice);
+  const marketPrice = formatCurrency(item.marketPrice);
+  priceRow.textContent = `Your price: ${yourPrice} · Market: ${marketPrice}`;
+
+  const metaEl = document.createElement("p");
+  metaEl.className = "product-meta";
+  if (item.lastUpdated) {
+    const d = new Date(item.lastUpdated);
+    if (!Number.isNaN(d.getTime())) {
+      metaEl.textContent =
+        "Updated " + d.toLocaleDateString() + " " + d.toLocaleTimeString();
+    }
+  }
+
+  const elements = [img, nameEl, setEl, priceRow, metaEl];
+
+  if (item.tcgPlayerUrl) {
+    const link = document.createElement("a");
+    link.href = item.tcgPlayerUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.className = "product-link";
+    link.textContent = "View on TCGplayer";
+    elements.push(link);
+  }
+
+  elements.forEach((el) => card.appendChild(el));
+  return card;
+}
+
 function renderInventory(items) {
   const grid = document.getElementById("productsGrid");
   const emptyState = document.getElementById("emptyState");
@@ -32,63 +117,44 @@ function renderInventory(items) {
 
   emptyState.classList.add("hidden");
 
+  // Group items by inferred game
+  const groups = {
+    pokemon: [],
+    mtg: [],
+    other: [],
+  };
+
   items.forEach((item) => {
-    const card = document.createElement("article");
-    card.className = "product-card";
-
-    const name = item.name || "Unnamed product";
-    const setName = item.setName || "";
-
-    card.dataset.name = name.toLowerCase();
-    card.dataset.set = setName.toLowerCase();
-
-    const img = document.createElement("img");
-    img.className = "product-image";
-    img.alt = name;
-    img.loading = "lazy";
-    if (item.imageUrl) {
-      img.src = item.imageUrl;
-    }
-
-    const nameEl = document.createElement("h2");
-    nameEl.className = "product-name";
-    nameEl.textContent = name;
-
-    const setEl = document.createElement("p");
-    setEl.className = "product-set";
-    setEl.textContent = setName;
-
-    const priceRow = document.createElement("p");
-    priceRow.className = "product-price-row";
-    const yourPrice = formatCurrency(item.yourPrice);
-    const marketPrice = formatCurrency(item.marketPrice);
-    priceRow.textContent = `Your price: ${yourPrice} · Market: ${marketPrice}`;
-
-    const metaEl = document.createElement("p");
-    metaEl.className = "product-meta";
-    if (item.lastUpdated) {
-      const d = new Date(item.lastUpdated);
-      if (!Number.isNaN(d.getTime())) {
-        metaEl.textContent =
-          "Updated " + d.toLocaleDateString() + " " + d.toLocaleTimeString();
-      }
-    }
-
-    const elements = [img, nameEl, setEl, priceRow, metaEl];
-
-    if (item.tcgPlayerUrl) {
-      const link = document.createElement("a");
-      link.href = item.tcgPlayerUrl;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.className = "product-link";
-      link.textContent = "View on TCGplayer";
-      elements.push(link);
-    }
-
-    elements.forEach((el) => card.appendChild(el));
-    grid.appendChild(card);
+    const game = detectGame(item);
+    if (game === "pokemon") groups.pokemon.push(item);
+    else if (game === "mtg") groups.mtg.push(item);
+    else groups.other.push(item);
   });
+
+  // Helper to render one group with a title
+  function renderGroup(title, list) {
+    if (!list.length) return;
+
+    const heading = document.createElement("h2");
+    heading.className = "products-group-title";
+    heading.textContent = title;
+    grid.appendChild(heading);
+
+    const subgrid = document.createElement("div");
+    subgrid.className = "products-subgrid";
+
+    list.forEach((item) => {
+      const card = createProductCard(item);
+      subgrid.appendChild(card);
+    });
+
+    grid.appendChild(subgrid);
+  }
+
+  // Order: Pokémon first, then MTG, then any uncategorized stuff
+  renderGroup("Pokémon Sealed Product", groups.pokemon);
+  renderGroup("Magic: The Gathering Sealed Product", groups.mtg);
+  renderGroup("Other", groups.other);
 }
 
 function computeLastUpdatedText(items) {

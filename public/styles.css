@@ -147,9 +147,27 @@ main {
   color: #9ca3af;
 }
 
-/* ---------- Products grid ---------- */
+/* ---------- Products grid container ---------- */
 
+/* Now acts as a vertical stack of groups (heading + subgrid) */
 #productsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Group heading (e.g., Pokémon / MTG) */
+.products-group-title {
+  margin: 18px 0 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #cbd5e1;
+}
+
+/* Actual grid for the cards inside each group */
+.products-subgrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 18px;
