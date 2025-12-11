@@ -110,7 +110,20 @@ app.get("/api/inventory", function (req, res) {
     return item && typeof item.quantity === "number" && item.quantity > 0;
   });
 
-  const items = visibleItems.map(function (item) {
+  // 🔹 NEW: sort by setName (A–Z), then by name (A–Z)
+  const sortedItems = visibleItems.slice().sort(function (a, b) {
+    const setA = (a.setName || "").toLowerCase();
+    const setB = (b.setName || "").toLowerCase();
+    if (setA !== setB) {
+      return setA.localeCompare(setB);
+    }
+
+    const nameA = (a.name || "").toLowerCase();
+    const nameB = (b.name || "").toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+
+  const items = sortedItems.map(function (item) {
     const market =
       typeof item.marketPrice === "number" ? item.marketPrice : null;
 
@@ -137,13 +150,14 @@ app.get("/api/inventory", function (req, res) {
       tcgPlayerUrl: item.tcgPlayerId
         ? "https://www.tcgplayer.com/product/" + item.tcgPlayerId
         : null,
-      // lets frontend compute "Prices last refreshed"
+      // lets frontend compute “Prices last refreshed”
       lastUpdated: item.lastUpdated || null,
     };
   });
 
   res.json({ items });
 });
+
 
 // ---------- API: admin raw inventory get/save ----------
 
