@@ -1,5 +1,8 @@
-// updatePrices.js - BATCH VERSION (100 IDs per JustTCG request)
-// MASSIVE efficiency upgrade: updates 100 items per API call
+// updatePrices.js - BATCH VERSION with Discord alerts
+// - Uses POST /v1/cards with up to 100 tcgplayerIds per request
+// - Only updates items you actually own (quantity > 0)
+// - Skips items updated in the last 24 hours
+// - Sends a summary Discord message when prices update
 
 require("dotenv").config();
 const fs = require("fs");
@@ -15,24 +18,50 @@ const API_URL = "https://api.justtcg.com/v1/cards";
 const INVENTORY_PATH = path.join(__dirname, "inventory.json");
 const TCG_IMAGE_BASE = "https://product-images.tcgplayer.com/fit-in/437x437/";
 
+const DISCORD_PRICE_WEBHOOK = process.env.DISCORD_PRICE_WEBHOOK;
+
 if (!API_KEY) {
   console.error("Missing JUSTTCG_API_KEY in .env");
   process.exit(1);
 }
 
-const BATCH_SIZE = 100; // new plan allows 100 IDs/request
+const BATCH_SIZE = 100; // your plan allows 100 IDs/request
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-// Conservative rate limit: 20 batch calls/min (2,000 IDs/min effective)
-const MAX_BATCH_CALLS_PER_MIN = 20;
+// Conservative rate limit: 40 batch calls/minute (4000 IDs/min effective)
+const MAX_BATCH_CALLS_PER_MIN = 40;
 let batchCallTimestamps = [];
 
+function sendDiscordMessage(webhookUrl, content) {
+  if (!webhookUrl || !content) return;
+  if (typeof fetch !== "function") return;
+
+  fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  })
+    .then((res) => {
+      if (!res.ok) {
+        console.error("Discord webhook failed with status", res.status);
+      }
+    })
+    .catch((err) => {
+      console.error("Discord webhook error:", err.message || err);
+    });
+}
+
 function loadInventory() {
-  const raw = fs.readFileSync(INVENTORY_PATH, "utf8");
-  const parsed = JSON.parse(raw);
-  if (Array.isArray(parsed)) return parsed;
-  if (parsed.items) return parsed.items;
-  return [];
+  try {
+    const raw = fs.readFileSync(INVENTORY_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && Array.isArray(parsed.items)) return parsed.items;
+    return [];
+  } catch (err) {
+    console.error("Error reading inventory.json:", err.message);
+    process.exit(1);
+  }
 }
 
 function saveInventory(inv) {
@@ -43,9 +72,7 @@ function saveInventory(inv) {
 async function rateLimitedBatchFetch(body) {
   const now = Date.now();
 
-  batchCallTimestamps = batchCallTimestamps.filter(
-    (t) => now - t < 60_000
-  );
+  batchCallTimestamps = batchCallTimestamps.filter((t) => now - t < 60_000);
 
   if (batchCallTimestamps.length >= MAX_BATCH_CALLS_PER_MIN) {
     const earliest = batchCallTimestamps[0];
@@ -87,15 +114,18 @@ async function main() {
   const inventory = loadInventory();
   const now = Date.now();
 
-  // Filter only items we need to update
+  // Only update:
+  // - items with tcgPlayerId
+  // - quantity > 0 (you own it)
+  // - lastUpdated is >24h old (or missing)
   const itemsToUpdate = inventory.filter((item) => {
-    if (!item.tcgPlayerId) return false;
-    if (!item.quantity || item.quantity <= 0) return false;
+    if (!item || !item.tcgPlayerId) return false;
+    if (typeof item.quantity !== "number" || item.quantity <= 0) return false;
 
     if (item.lastUpdated) {
       const t = Date.parse(item.lastUpdated);
       if (!Number.isNaN(t) && now - t < ONE_DAY_MS) {
-        return false; // updated <24h ago → skip
+        return false;
       }
     }
 
@@ -103,8 +133,13 @@ async function main() {
   });
 
   console.log(
-    `Total inventory: ${inventory.length}, need updates: ${itemsToUpdate.length}`
+    `Total inventory: ${inventory.length}, items to update (qty>0 & >24h old): ${itemsToUpdate.length}`
   );
+
+  if (itemsToUpdate.length === 0) {
+    console.log("Nothing to update (all items refreshed within last 24h).");
+    return;
+  }
 
   const idList = itemsToUpdate.map((i) => ({
     tcgplayerId: i.tcgPlayerId.toString(),
@@ -115,6 +150,7 @@ async function main() {
 
   let updated = 0;
   let apiCalls = 0;
+  const priceUpdateLines = [];
 
   for (let b = 0; b < batches.length; b++) {
     console.log(
@@ -126,15 +162,18 @@ async function main() {
       data = await rateLimitedBatchFetch(batches[b]);
       apiCalls++;
     } catch (err) {
-      console.error("Batch failed:", err.message);
+      console.error("Batch failed:", err.message || err);
       continue;
     }
 
-    const results = data.data || [];
+    const results = data && Array.isArray(data.data) ? data.data : [];
 
     for (const card of results) {
       const item = inventory.find(
-        (i) => i.tcgPlayerId && i.tcgPlayerId.toString() === card.tcgplayerId
+        (i) =>
+          i &&
+          i.tcgPlayerId &&
+          i.tcgPlayerId.toString() === String(card.tcgplayerId)
       );
       if (!item) continue;
 
@@ -157,11 +196,11 @@ async function main() {
       }
 
       updated++;
-      console.log(
-        `  ✓ Updated ${item.name} → $${item.marketPrice.toFixed(
-          2
-        )} (${item.yourPrice})`
-      );
+      const line = `• ${item.name} → $${item.yourPrice.toFixed(
+        2
+      )} (market $${item.marketPrice.toFixed(2)}) qty:${item.quantity ?? 0}`;
+      console.log("  " + line);
+      priceUpdateLines.push(line);
     }
   }
 
@@ -173,6 +212,16 @@ async function main() {
   console.log(
     `Effective items/request: ${(updated / Math.max(apiCalls, 1)).toFixed(1)}`
   );
+
+  // Discord alert for price updates
+  if (updated > 0 && DISCORD_PRICE_WEBHOOK) {
+    let header = `📈 Price update completed.\nUpdated items: ${updated}\n\n`;
+    let body = priceUpdateLines.join("\n");
+    if (body.length > 1800) {
+      body = body.slice(0, 1800) + "\n… (truncated)";
+    }
+    sendDiscordMessage(DISCORD_PRICE_WEBHOOK, header + body);
+  }
 }
 
 main().catch((err) => {
