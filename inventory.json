@@ -88,17 +88,6 @@
     "lastUpdated": "2025-12-11T00:10:47.583Z"
   },
   {
-    "name": "Prismatic Evolutions Lucario ex & Tyranitar ex Premium Collection (Sam's Club)",
-    "quantity": 1,
-    "tcgPlayerId": "648365",
-    "setName": "Miscellaneous Cards & Products",
-    "marketPrice": 117.99,
-    "yourPrice": 106.19,
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/648365.jpg",
-    "tcgPlayerUrl": "https://www.tcgplayer.com/product/648365",
-    "lastUpdated": "2025-12-11T00:10:48.275Z"
-  },
-  {
     "name": "Leafeon VSTAR Special Collection",
     "quantity": 2,
     "tcgPlayerId": "256147",
@@ -460,5 +449,16 @@
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/665113.jpg",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/665113",
     "lastUpdated": "2025-12-11T00:14:43.310Z"
+  },
+  {
+    "name": "Salamence ex & Reshiram ex Premium Collection",
+    "quantity": 2,
+    "tcgPlayerId": "653899",
+    "setName": "Miscellaneous Cards & Products",
+    "marketPrice": 57.37,
+    "yourPrice": 51.63,
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/653899.jpg",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/653899",
+    "lastUpdated": "2025-12-11T00:35:22.209Z"
   }
 ]
