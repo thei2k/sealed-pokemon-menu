@@ -1,4 +1,8 @@
 // updatePrices.js - run locally to refresh prices into inventory.json
+// Optimized for low JustTCG usage:
+// - Only updates items you actually own (quantity > 0)
+// - Skips items updated in the last 24 hours
+// - Rate-limited to 10 calls/min by default
 
 require("dotenv").config();
 const fs = require("fs");
@@ -22,9 +26,12 @@ if (!API_KEY) {
 
 const INVENTORY_PATH = path.join(__dirname, "inventory.json");
 
-// Max 30 calls per rolling minute to stay under your 50/min JustTCG plan
-const MAX_CALLS_PER_MINUTE = 30;
+// Be conservative on rate limit to avoid 429s.
+// If you're 100% sure your plan allows 50/min, you can safely bump this to 20 or 30.
+const MAX_CALLS_PER_MINUTE = 10;
 let apiCallTimestamps = [];
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 function loadInventory() {
   try {
@@ -126,29 +133,52 @@ async function rateLimitedFetchSealedPrice(tcgPlayerId) {
 
 async function main() {
   const inventory = loadInventory();
+  const now = Date.now();
+
+  // Decide which items we actually want to hit JustTCG for:
+  // - must have a tcgPlayerId
+  // - quantity > 0 (you actually own it)
+  // - either never updated OR lastUpdated is older than 24 hours
+  const itemsToUpdate = inventory.filter((item) => {
+    if (!item || !item.tcgPlayerId) return false;
+    if (typeof item.quantity !== "number" || item.quantity <= 0) return false;
+
+    if (item.lastUpdated) {
+      const t = Date.parse(item.lastUpdated);
+      if (!Number.isNaN(t)) {
+        const age = now - t;
+        if (age < ONE_DAY_MS) {
+          // Already updated in the last 24 hours – skip to save API calls
+          return false;
+        }
+      }
+    }
+
+    return true;
+  });
 
   console.log(
-    "Updating prices for",
-    inventory.length,
-    "items using JustTCG (offline)..."
+    "Total items in inventory:",
+    inventory.length
+  );
+  console.log(
+    "Items eligible for price update (qty > 0 and not updated in last 24h):",
+    itemsToUpdate.length
   );
 
-  for (let i = 0; i < inventory.length; i++) {
-    const item = inventory[i];
+  let successfulUpdates = 0;
+  let apiCallsMade = 0;
 
-    if (!item.tcgPlayerId) {
-      console.log(
-        `[${i + 1}/${inventory.length}] Skipping "${item.name}" (no tcgPlayerId)`
-      );
-      continue;
-    }
+  for (let i = 0; i < itemsToUpdate.length; i++) {
+    const item = itemsToUpdate[i];
 
     try {
       console.log(
-        `[${i + 1}/${inventory.length}] Fetching price for "${item.name}" (TCGplayer ${item.tcgPlayerId})...`
+        `[${i + 1}/${itemsToUpdate.length}] Fetching price for "${item.name}" (TCGplayer ${item.tcgPlayerId})...`
       );
 
       const data = await rateLimitedFetchSealedPrice(item.tcgPlayerId);
+      apiCallsMade++;
 
       item.setName = data.setName;
       item.marketPrice = data.marketPrice;
@@ -171,9 +201,11 @@ async function main() {
           2
         )}, setName = ${item.setName}, lastUpdated = ${item.lastUpdated}`
       );
+
+      successfulUpdates++;
     } catch (err) {
       console.error(
-        `[${i + 1}/${inventory.length}] Error updating "${item.name}":`,
+        `  !! Error updating "${item.name}":`,
         err.message || err
       );
       // Keep old price if any; just log the problem
@@ -181,7 +213,16 @@ async function main() {
   }
 
   saveInventory(inventory);
-  console.log("Done. inventory.json updated with latest prices.");
+
+  console.log(
+    `Done. ${successfulUpdates} items updated, ${apiCallsMade} JustTCG calls made.`
+  );
+  console.log(
+    "Remember: running this once per day keeps you within your 10k/month cap as long as:",
+  );
+  console.log(
+    "  (itemsToUpdate_per_day * 30 days) <= 10,000"
+  );
 }
 
 main().catch((err) => {
