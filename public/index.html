@@ -1,40 +1,50 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="utf-8" />
     <title>Sealed Pokémon Inventory</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header class="site-header">
-      <div class="header-inner">
-        <h1>Sealed Pokémon Inventory</h1>
-        <p class="subtitle">Browse what’s in stock – prices auto-sync to 90% of TCGplayer market.</p>
-      </div>
-    </header>
+    <div class="app-root">
+      <!-- Hero / banner area -->
+      <header class="app-header">
+        <div class="app-header-inner">
+          <div class="logo-pill">
+            <span class="logo-dot"></span>
+            <span class="logo-text">RPE</span>
+          </div>
 
-    <main class="content">
-      <section class="toolbar">
-        <input
-          id="searchInput"
-          type="text"
-          placeholder="Search products or sets..."
-        />
-        <span id="lastUpdated" class="last-updated"></span>
-      </section>
+          <div class="hero-text">
+            <h1 class="page-title">Sealed Pokémon Inventory</h1>
+            <p class="page-subtitle">
+              Live pricing on sealed product, powered by JustTCG and updated regularly.
+            </p>
+          </div>
+        </div>
+      </header>
 
-      <section id="productsGrid" class="products-grid"></section>
+      <!-- Main content shell -->
+      <main>
+        <section class="toolbar">
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Search by product name or set..."
+            autocomplete="off"
+          />
+          <div id="lastUpdated">Prices last refreshed: N/A</div>
+        </section>
 
-      <section id="emptyState" class="empty-state hidden">
-        <p>No products to show yet. Add some items in <code>inventory.json</code> or via the admin page.</p>
-      </section>
-    </main>
+        <section id="productsGrid"></section>
 
-    <footer class="site-footer">
-      <p>Prices are approximate and based on TCGplayer market (via PokemonPriceTracker).</p>
-    </footer>
+        <p id="emptyState" class="hidden">
+          No products are currently available. Please check back later.
+        </p>
+      </main>
+    </div>
 
-    <script src="main.js"></script>
+    <script src="/main.js"></script>
   </body>
 </html>

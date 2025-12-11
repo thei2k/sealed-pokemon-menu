@@ -16,52 +16,99 @@ body {
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-  background: radial-gradient(circle at top, #e5f0ff 0, #f3f4f6 45%, #f9fafb 100%);
-  color: #111827;
+  background: radial-gradient(circle at top, #0b1120 0, #020617 45%, #020617 100%);
+  color: #e5e7eb;
 }
 
-/* Centered content column */
-
-main {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 24px 16px 40px;
-}
-
-/* ---------- Header / top bar ---------- */
-
-.page-header {
+/* Root wrapper so we can center things nicely */
+.app-root {
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 24px;
+}
+
+/* ---------- Hero / header ---------- */
+
+.app-header {
+  background: radial-gradient(circle at top left, #22c55e 0, transparent 55%),
+    radial-gradient(circle at top right, #3b82f6 0, transparent 60%),
+    linear-gradient(135deg, #020617, #0b1120);
+  padding: 20px 16px 26px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.7);
+}
+
+.app-header-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Little logo pill on the left */
+.logo-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background-color: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+}
+
+.logo-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: conic-gradient(from 180deg, #22c55e, #3b82f6, #f97316, #22c55e);
+}
+
+.logo-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #e5e7eb;
+}
+
+.hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .page-title {
-  font-size: 1.75rem;
+  margin: 0;
+  font-size: 1.8rem;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: #0f172a;
+  color: #f9fafb;
 }
 
 .page-subtitle {
-  font-size: 0.95rem;
-  color: #6b7280;
+  margin: 0;
+  font-size: 0.9rem;
+  color: #cbd5f5;
+  max-width: 520px;
 }
 
 @media (min-width: 768px) {
-  .page-header {
-    flex-direction: row;
-    align-items: flex-end;
-    justify-content: space-between;
-  }
-
   .page-title {
     font-size: 2rem;
   }
 }
 
-/* ---------- Toolbar: search + last updated ---------- */
+/* ---------- Main content ---------- */
+
+main {
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 22px 16px 40px;
+}
+
+/* Toolbar: search + last updated */
 
 .toolbar {
   display: flex;
@@ -72,12 +119,13 @@ main {
 }
 
 #searchInput {
-  flex: 1 1 220px;
+  flex: 1 1 230px;
   min-width: 0;
   padding: 10px 12px;
   border-radius: 999px;
-  border: 1px solid #d1d5db;
-  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  background-color: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
   font-size: 0.95rem;
   outline: none;
   transition: border-color 120ms ease, box-shadow 120ms ease,
@@ -85,18 +133,18 @@ main {
 }
 
 #searchInput::placeholder {
-  color: #9ca3af;
+  color: #64748b;
 }
 
 #searchInput:focus {
   border-color: #3b82f6;
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
-  background-color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.3);
+  background-color: #020617;
 }
 
 #lastUpdated {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: #9ca3af;
 }
 
 /* ---------- Products grid ---------- */
@@ -113,10 +161,10 @@ main {
   margin-top: 40px;
   padding: 28px 20px;
   border-radius: 16px;
-  background-color: rgba(255, 255, 255, 0.9);
-  border: 1px dashed #d1d5db;
+  background-color: rgba(15, 23, 42, 0.9);
+  border: 1px dashed rgba(148, 163, 184, 0.7);
   text-align: center;
-  color: #6b7280;
+  color: #cbd5e1;
   font-size: 0.95rem;
 }
 
@@ -133,28 +181,36 @@ main {
   gap: 8px;
   padding: 14px 14px 16px;
   border-radius: 18px;
-  background: linear-gradient(145deg, #ffffff, #f9fafb);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+  background: radial-gradient(circle at top left, #e5e7eb 0, #f9fafb 45%);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.55);
   transition: transform 130ms ease, box-shadow 130ms ease,
     background-color 130ms ease;
 }
 
-.product-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+.product-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  pointer-events: none;
 }
 
-/* ---------- Image treatment (fixes TCG white backgrounds) ---------- */
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.8);
+}
+
+/* ---------- Image treatment (white TCG backgrounds) ---------- */
 
 .product-image {
   width: 100%;
   border-radius: 14px;
-  /* Soft "card" frame behind the image so TCG white background looks intentional */
-  background-color: #f9fafb;
+  background-color: #ffffff; /* keep this white so TCG images blend */
   padding: 8px;
   object-fit: contain;
   aspect-ratio: 1 / 1;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.03);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
 }
 
 /* ---------- Text inside the card ---------- */
@@ -179,11 +235,6 @@ main {
   font-size: 0.9rem;
   font-weight: 500;
   color: #111827;
-}
-
-.product-price-row span {
-  font-weight: 400;
-  color: #6b7280;
 }
 
 /* Meta: updated timestamp */
@@ -216,7 +267,7 @@ main {
   text-decoration: underline;
 }
 
-/* ---------- Admin / status styles (used by admin.html) ---------- */
+/* ---------- Admin / status styles (admin.html) ---------- */
 
 .status-message {
   margin-top: 10px;
@@ -224,11 +275,11 @@ main {
 }
 
 .status-message.success {
-  color: #15803d;
+  color: #4ade80;
 }
 
 .status-message.error {
-  color: #b91c1c;
+  color: #fca5a5;
 }
 
 /* Basic table styling for admin page */
@@ -238,27 +289,30 @@ main {
   border-collapse: collapse;
   margin-top: 16px;
   font-size: 0.9rem;
+  color: #e5e7eb;
 }
 
 .admin-table th,
 .admin-table td {
   padding: 8px 10px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #1f2933;
 }
 
 .admin-table th {
   text-align: left;
   font-weight: 600;
-  color: #4b5563;
-  background-color: #f9fafb;
+  color: #cbd5e1;
+  background-color: #020617;
 }
 
 .admin-table input {
   width: 100%;
   padding: 4px 6px;
   border-radius: 6px;
-  border: 1px solid #d1d5db;
+  border: 1px solid #374151;
   font-size: 0.85rem;
+  background-color: #020617;
+  color: #e5e7eb;
 }
 
 .admin-table button {
@@ -275,7 +329,7 @@ main {
   background-color: #dc2626;
 }
 
-/* ---------- Buttons (if you have any generic ones) ---------- */
+/* ---------- Generic button class (if needed) ---------- */
 
 .button {
   display: inline-flex;

@@ -104,6 +104,7 @@ async function rateLimitedBatchFetch(body) {
     throw new Error(`JustTCG batch error ${res.status}: ${txt}`);
   }
 
+  // Could be { data: [...] } or just [...]
   return res.json();
 }
 
@@ -191,21 +192,30 @@ async function main() {
       `\n[Batch ${b + 1}/${batches.length}] fetching ${batches[b].length} items...`
     );
 
-    let data;
+    let result;
     try {
-      data = await rateLimitedBatchFetch(batches[b]);
+      result = await rateLimitedBatchFetch(batches[b]);
       apiCalls++;
     } catch (err) {
       console.error("Batch fetch failed:", err.message || err);
       continue;
     }
 
-    if (!Array.isArray(data)) {
-      console.error("Unexpected API response format, expected array.");
+    // Handle both array and { data: [...] }
+    let cards;
+    if (Array.isArray(result)) {
+      cards = result;
+    } else if (result && Array.isArray(result.data)) {
+      cards = result.data;
+    } else {
+      console.error(
+        "Unexpected API response format, expected array or { data: [...] }."
+      );
+      console.error("Raw response shape keys:", result && Object.keys(result));
       continue;
     }
 
-    for (const card of data) {
+    for (const card of cards) {
       if (!card || !card.tcgplayerId) continue;
 
       const id = String(card.tcgplayerId);
