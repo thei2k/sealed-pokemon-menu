@@ -1,7 +1,7 @@
 // updatePrices.js - BATCH VERSION with Discord alerts
 // - Uses POST /v1/cards with up to 100 tcgplayerIds per request
 // - Only updates items you actually own (quantity > 0)
-// - Skips items updated in the last 24 hours
+// - Skips items updated in the last 24 hours (unless --force)
 // - Sends a summary Discord message when prices update
 
 require("dotenv").config();
@@ -30,6 +30,8 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 // Conservative rate limit: 40 batch calls/minute (4000 IDs/min effective)
 const MAX_BATCH_CALLS_PER_MIN = 40;
+const PRICE_MULTIPLIER = 0.9;
+
 let batchCallTimestamps = [];
 
 function sendDiscordMessage(webhookUrl, content) {
@@ -59,8 +61,8 @@ function loadInventory() {
     if (parsed && Array.isArray(parsed.items)) return parsed.items;
     return [];
   } catch (err) {
-    console.error("Error reading inventory.json:", err.message);
-    process.exit(1);
+    console.error("Error reading inventory.json:", err.message || err);
+    return [];
   }
 }
 
@@ -72,15 +74,18 @@ function saveInventory(inv) {
 async function rateLimitedBatchFetch(body) {
   const now = Date.now();
 
+  // Keep only last 60 seconds of timestamps
   batchCallTimestamps = batchCallTimestamps.filter((t) => now - t < 60_000);
 
   if (batchCallTimestamps.length >= MAX_BATCH_CALLS_PER_MIN) {
-    const earliest = batchCallTimestamps[0];
-    const waitMs = 60_000 - (now - earliest) + 50;
-    const waitSec = Math.ceil(waitMs / 1000);
-
-    console.log(`Rate-limit: waiting ${waitSec}s before next batch...`);
-    await new Promise((r) => setTimeout(r, waitMs));
+    const oldest = Math.min(...batchCallTimestamps);
+    const waitMs = 60_000 - (now - oldest);
+    console.log(
+      `Rate limit hit (${batchCallTimestamps.length}/${MAX_BATCH_CALLS_PER_MIN} calls in last minute). Waiting ${Math.ceil(
+        waitMs / 1000
+      )}s...`
+    );
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
   }
 
   batchCallTimestamps.push(Date.now());
@@ -111,20 +116,32 @@ function chunkArray(arr, size) {
 }
 
 async function main() {
+  const force = process.argv.includes("--force");
   const inventory = loadInventory();
   const now = Date.now();
 
-  // Only update:
-  // - items with tcgPlayerId
-  // - quantity > 0 (you own it)
-  // - lastUpdated is >24h old (or missing)
-  const itemsToUpdate = inventory.filter((item) => {
-    if (!item || !item.tcgPlayerId) return false;
-    if (typeof item.quantity !== "number" || item.quantity <= 0) return false;
+  let skippedNoId = 0;
+  let skippedQty = 0;
+  let skippedRecent = 0;
 
-    if (item.lastUpdated) {
+  const candidates = inventory.filter((item) => {
+    if (!item) return false;
+
+    if (!item.tcgPlayerId) {
+      skippedNoId++;
+      return false;
+    }
+
+    const qty = Number(item.quantity);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      skippedQty++;
+      return false;
+    }
+
+    if (!force && item.lastUpdated) {
       const t = Date.parse(item.lastUpdated);
       if (!Number.isNaN(t) && now - t < ONE_DAY_MS) {
+        skippedRecent++;
         return false;
       }
     }
@@ -133,16 +150,33 @@ async function main() {
   });
 
   console.log(
-    `Total inventory: ${inventory.length}, items to update (qty>0 & >24h old): ${itemsToUpdate.length}`
+    `Total inventory: ${inventory.length}\n→ Candidates: ${candidates.length} (qty>0${
+      force ? "" : " & >24h old"
+    })`
+  );
+  console.log(
+    `Skipped: no id=${skippedNoId}, qty<=0=${skippedQty}${
+      force ? "" : `, recent(<24h)=${skippedRecent}`
+    }`
   );
 
-  if (itemsToUpdate.length === 0) {
-    console.log("Nothing to update (all items refreshed within last 24h).");
+  if (candidates.length === 0) {
+    console.log("Nothing to update.");
     return;
   }
 
-  const idList = itemsToUpdate.map((i) => ({
-    tcgplayerId: i.tcgPlayerId.toString(),
+  // Map tcgplayerId -> list of items
+  const idToItems = new Map();
+  for (const item of candidates) {
+    const id = String(item.tcgPlayerId).trim();
+    if (!id) continue;
+    const list = idToItems.get(id) || [];
+    list.push(item);
+    idToItems.set(id, list);
+  }
+
+  const idList = Array.from(idToItems.keys()).map((id) => ({
+    tcgplayerId: id,
   }));
 
   const batches = chunkArray(idList, BATCH_SIZE);
@@ -162,45 +196,60 @@ async function main() {
       data = await rateLimitedBatchFetch(batches[b]);
       apiCalls++;
     } catch (err) {
-      console.error("Batch failed:", err.message || err);
+      console.error("Batch fetch failed:", err.message || err);
       continue;
     }
 
-    const results = data && Array.isArray(data.data) ? data.data : [];
+    if (!Array.isArray(data)) {
+      console.error("Unexpected API response format, expected array.");
+      continue;
+    }
 
-    for (const card of results) {
-      const item = inventory.find(
-        (i) =>
-          i &&
-          i.tcgPlayerId &&
-          i.tcgPlayerId.toString() === String(card.tcgplayerId)
-      );
-      if (!item) continue;
+    for (const card of data) {
+      if (!card || !card.tcgplayerId) continue;
+
+      const id = String(card.tcgplayerId);
+      const itemsForId = idToItems.get(id);
+      if (!itemsForId || itemsForId.length === 0) continue;
 
       let variant =
         (card.variants || []).find((v) => v.condition === "Sealed") ||
         (card.variants || [])[0];
 
-      if (!variant || variant.price == null) continue;
-
-      const price = Number(variant.price);
-      if (!Number.isFinite(price)) continue;
-
-      item.marketPrice = price;
-      item.yourPrice = Number((price * 0.9).toFixed(2));
-      item.setName = card.set_name || item.setName || null;
-      item.lastUpdated = new Date().toISOString();
-
-      if (!item.imageUrl) {
-        item.imageUrl = TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg";
+      if (!variant || variant.price == null) {
+        for (const item of itemsForId) {
+          item.priceError = "No sealed price returned";
+        }
+        continue;
       }
 
-      updated++;
-      const line = `• ${item.name} → $${item.yourPrice.toFixed(
-        2
-      )} (market $${item.marketPrice.toFixed(2)}) qty:${item.quantity ?? 0}`;
-      console.log("  " + line);
-      priceUpdateLines.push(line);
+      const price = Number(variant.price);
+      if (!Number.isFinite(price) || price <= 0 || price > 10000) {
+        for (const item of itemsForId) {
+          item.priceError = "Unreasonable price returned";
+        }
+        continue;
+      }
+
+      for (const item of itemsForId) {
+        delete item.priceError;
+
+        item.marketPrice = price;
+        item.yourPrice = Number((price * PRICE_MULTIPLIER).toFixed(2));
+        item.setName = card.set_name || item.setName || null;
+        item.lastUpdated = new Date().toISOString();
+
+        if (!item.imageUrl && item.tcgPlayerId) {
+          item.imageUrl = TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg";
+        }
+
+        updated++;
+        const line = `• ${item.name} → $${item.yourPrice.toFixed(
+          2
+        )} (market $${item.marketPrice.toFixed(2)}) qty:${item.quantity ?? 0}`;
+        console.log("  " + line);
+        priceUpdateLines.push(line);
+      }
     }
   }
 

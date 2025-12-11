@@ -1,4 +1,4 @@
-// server.js - Strategy A: no live JustTCG calls in production, with Discord alerts
+// server.js - No live JustTCG calls. Serves inventory + admin with Discord stock alerts.
 
 require("dotenv").config();
 const express = require("express");
@@ -8,19 +8,15 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Admin password (for /admin.html and admin APIs)
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-
-// Discord webhooks (set these in your .env)
-const DISCORD_STOCK_WEBHOOK = process.env.DISCORD_STOCK_WEBHOOK; // for new products
-const DISCORD_PRICE_WEBHOOK = process.env.DISCORD_PRICE_WEBHOOK; // used in updatePrices.js
-
-// TCGplayer image base – we’ll append the productId + ".jpg"
-const TCG_IMAGE_BASE = "https://product-images.tcgplayer.com/fit-in/437x437/";
+const DISCORD_STOCK_WEBHOOK = process.env.DISCORD_STOCK_WEBHOOK;
 
 const INVENTORY_PATH = path.join(__dirname, "inventory.json");
 
+// Parse JSON bodies for admin POST
 app.use(express.json());
+
+// ---------- Helpers ----------
 
 function sendDiscordMessage(webhookUrl, content) {
   if (!webhookUrl || !content) return;
@@ -41,12 +37,24 @@ function sendDiscordMessage(webhookUrl, content) {
     });
 }
 
-/**
- * Admin auth middleware using Basic Auth.
- * Username: admin
- * Password: ADMIN_PASSWORD env var
- */
-function requireAdminAuth(req, res, next) {
+function loadInventory() {
+  try {
+    const raw = fs.readFileSync(INVENTORY_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && Array.isArray(parsed.items)) return parsed.items;
+    return [];
+  } catch (err) {
+    console.error("Error reading inventory.json:", err.message || err);
+    return [];
+  }
+}
+
+function saveInventory(items) {
+  fs.writeFileSync(INVENTORY_PATH, JSON.stringify(items, null, 2), "utf8");
+}
+
+function requireAdmin(req, res, next) {
   if (!ADMIN_PASSWORD) {
     console.warn("ADMIN_PASSWORD not set; blocking admin access.");
     return res.status(500).send("Admin not configured.");
@@ -61,171 +69,163 @@ function requireAdminAuth(req, res, next) {
 
   const base64Part = authHeader.split(" ")[1];
   const decoded = Buffer.from(base64Part, "base64").toString("utf8"); // "user:pass"
-  const parts = decoded.split(":");
-  const user = parts[0];
-  const pass = parts.slice(1).join(":");
+  const idx = decoded.indexOf(":");
+  const user = idx >= 0 ? decoded.slice(0, idx) : decoded;
+  const pass = idx >= 0 ? decoded.slice(idx + 1) : "";
 
-  if (user === "admin" && pass === ADMIN_PASSWORD) {
-    return next();
+  // User name is ignored; only password matters
+  if (pass !== ADMIN_PASSWORD) {
+    return res.status(403).send("Forbidden");
   }
 
-  res.setHeader("WWW-Authenticate", 'Basic realm="Admin Area"');
-  return res.status(401).send("Invalid credentials.");
+  next();
 }
 
-// Protect the admin HTML
-app.get("/admin.html", requireAdminAuth, function (req, res) {
+// ---------- Routes ----------
+
+// Protect /admin.html explicitly BEFORE static middleware
+app.get("/admin.html", requireAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 
-// Serve static frontend files (index.html, JS, CSS, etc.)
+// Static frontend (index.html, JS, CSS, etc.)
 app.use(express.static(path.join(__dirname, "public")));
 
-// ---------- Helpers: inventory file ----------
+// GET /api/inventory – public view (quantity > 0, sorted)
+app.get("/api/inventory", (req, res) => {
+  const inv = loadInventory();
 
-function loadInventory() {
-  try {
-    const raw = fs.readFileSync(INVENTORY_PATH, "utf8");
-    const data = JSON.parse(raw);
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.items)) return data.items;
-    return [];
-  } catch (err) {
-    console.error("Error reading inventory.json:", err.message);
-    return [];
-  }
-}
-
-function saveInventory(data) {
-  fs.writeFileSync(INVENTORY_PATH, JSON.stringify(data, null, 2), "utf8");
-}
-
-// ---------- API: inventory with pricing (NO JustTCG; uses inventory.json only) ----------
-
-app.get("/api/inventory", function (req, res) {
-  const fullInventory = loadInventory();
-
-  // Only show items with quantity > 0
-  const visibleItems = fullInventory.filter(function (item) {
-    return item && typeof item.quantity === "number" && item.quantity > 0;
+  const filtered = inv.filter((item) => {
+    if (!item) return false;
+    const qty = Number(item.quantity);
+    return Number.isFinite(qty) && qty > 0;
   });
 
-  // 🔹 NEW: sort by setName (A–Z), then by name (A–Z)
-  const sortedItems = visibleItems.slice().sort(function (a, b) {
+  const mapped = filtered.map((item) => ({
+    name: item.name || "",
+    setName: item.setName || null,
+    quantity: Number.isFinite(Number(item.quantity))
+      ? Number(item.quantity)
+      : 0,
+    marketPrice:
+      typeof item.marketPrice === "number" ? item.marketPrice : null,
+    yourPrice: typeof item.yourPrice === "number" ? item.yourPrice : null,
+    lastUpdated: item.lastUpdated || null,
+    tcgPlayerId: item.tcgPlayerId || null,
+    tcgPlayerUrl: item.tcgPlayerId
+      ? `https://www.tcgplayer.com/product/${item.tcgPlayerId}`
+      : null,
+    imageUrl: item.imageUrl || null,
+  }));
+
+  mapped.sort((a, b) => {
     const setA = (a.setName || "").toLowerCase();
     const setB = (b.setName || "").toLowerCase();
-    if (setA !== setB) {
-      return setA.localeCompare(setB);
-    }
+    if (setA < setB) return -1;
+    if (setA > setB) return 1;
 
     const nameA = (a.name || "").toLowerCase();
     const nameB = (b.name || "").toLowerCase();
-    return nameA.localeCompare(nameB);
+    if (nameA < nameB) return -1;
+    if (nameA > nameB) return 1;
+    return 0;
   });
 
-  const items = sortedItems.map(function (item) {
-    const market =
-      typeof item.marketPrice === "number" ? item.marketPrice : null;
-
-    // Prefer stored yourPrice if numeric; otherwise derive from market
-    const yourPrice =
-      typeof item.yourPrice === "number"
-        ? item.yourPrice
-        : typeof market === "number"
-        ? Number((market * 0.9).toFixed(2))
-        : null;
-
-    return {
-      name: item.name,
-      quantity: item.quantity,
-      tcgPlayerId: item.tcgPlayerId,
-      setName: item.setName || null,
-      marketPrice: market,
-      yourPrice: yourPrice,
-      imageUrl:
-        item.imageUrl ||
-        (item.tcgPlayerId
-          ? TCG_IMAGE_BASE + item.tcgPlayerId + ".jpg"
-          : null),
-      tcgPlayerUrl: item.tcgPlayerId
-        ? "https://www.tcgplayer.com/product/" + item.tcgPlayerId
-        : null,
-      // lets frontend compute “Prices last refreshed”
-      lastUpdated: item.lastUpdated || null,
-    };
-  });
-
-  res.json({ items });
+  res.json(mapped);
 });
 
-
-// ---------- API: admin raw inventory get/save ----------
-
-// Raw inventory for admin UI table (no filtering, full objects)
-app.get("/api/raw-inventory", requireAdminAuth, function (req, res) {
-  res.json(loadInventory());
+// GET /api/raw-inventory – full JSON for admin
+app.get("/api/raw-inventory", requireAdmin, (req, res) => {
+  const inv = loadInventory();
+  res.json(inv);
 });
 
-/**
- * Admin JSON save from /admin.html.
- * We MERGE admin-edited items into existing inventory so we preserve
- * setName / marketPrice / yourPrice / imageUrl / lastUpdated until you refresh via updatePrices.js.
- * Also detects NEW products and sends a Discord alert to the stock channel.
- */
-app.post("/api/inventory", requireAdminAuth, function (req, res) {
-  if (!Array.isArray(req.body)) {
-    return res.status(400).json({ error: "Body must be an array" });
+// POST /api/inventory – admin save + Discord new-stock alert
+app.post("/api/inventory", requireAdmin, (req, res) => {
+  const payload = req.body;
+
+  if (!Array.isArray(payload)) {
+    return res.status(400).json({ error: "Expected an array of items" });
   }
 
-  const existing = loadInventory();
-  const byKey = new Map();
+  const oldInventory = loadInventory();
 
-  // Use tcgPlayerId as key; fallback to name
-  for (const item of existing) {
+  const existingById = new Map();
+  const existingByName = new Map();
+
+  for (const item of oldInventory) {
     if (!item) continue;
-    const key = item.tcgPlayerId || item.name;
-    if (key) {
-      byKey.set(key, item);
+    const id = item.tcgPlayerId ? String(item.tcgPlayerId).trim() : "";
+    const nameKey = item.name ? item.name.trim().toLowerCase() : "";
+
+    if (id) {
+      existingById.set(id, item);
+    } else if (nameKey) {
+      existingByName.set(nameKey, item);
     }
   }
 
+  const nextInventory = [];
   const newItems = [];
 
-  const merged = req.body.map(function (incoming) {
-    const key = incoming.tcgPlayerId || incoming.name;
-    const old = key ? byKey.get(key) : null;
+  for (const row of payload) {
+    if (!row) continue;
 
-    const base = {
-      name: incoming.name,
-      tcgPlayerId: incoming.tcgPlayerId,
-      quantity:
-        typeof incoming.quantity === "number"
-          ? incoming.quantity
-          : Number(incoming.quantity) || 0,
-    };
+    const nameRaw = row.name || "";
+    const idRaw = row.tcgPlayerId || "";
+    const qtyRaw = row.quantity;
 
-    if (old) {
-      base.setName = old.setName;
-      base.marketPrice = old.marketPrice;
-      base.imageUrl = old.imageUrl;
-      base.yourPrice = old.yourPrice;
-      base.lastUpdated = old.lastUpdated;
+    const name = nameRaw.trim();
+    const tcgId = String(idRaw).trim();
+    let quantity = Number(qtyRaw);
+    if (!Number.isFinite(quantity) || quantity < 0) quantity = 0;
+
+    // Skip rows that are effectively empty
+    if (!name && !tcgId) continue;
+
+    let existing =
+      (tcgId && existingById.get(tcgId)) ||
+      (name && existingByName.get(name.toLowerCase())) ||
+      null;
+
+    if (existing) {
+      const updated = {
+        ...existing,
+        name: name || existing.name,
+        tcgPlayerId: tcgId || existing.tcgPlayerId,
+        quantity,
+      };
+      nextInventory.push(updated);
+
+      if (tcgId) existingById.delete(tcgId);
+      if (name) existingByName.delete(name.toLowerCase());
     } else {
-      newItems.push(base);
+      const fresh = {
+        name: name || "Unnamed product",
+        tcgPlayerId: tcgId || null,
+        quantity,
+        setName: null,
+        marketPrice: null,
+        yourPrice: null,
+        imageUrl: null,
+        lastUpdated: null,
+      };
+      nextInventory.push(fresh);
+      newItems.push(fresh);
     }
+  }
 
-    return base;
-  });
+  // Items not present in payload are treated as removed on purpose
 
-  saveInventory(merged);
-  res.json({ ok: true, count: merged.length });
+  saveInventory(nextInventory);
 
-  // Discord alert for NEW products
-  if (newItems.length > 0 && DISCORD_STOCK_WEBHOOK) {
-    let header = `🆕 New products added to inventory: ${newItems.length}\n\n`;
+  if (newItems.length && DISCORD_STOCK_WEBHOOK) {
+    let header = `📦 New stock added (${newItems.length} items):\n\n`;
     const lines = newItems.map((item) => {
-      const idText = item.tcgPlayerId ? ` (TCGplayer ${item.tcgPlayerId})` : "";
-      return `• ${item.name}${idText} qty:${item.quantity}`;
+      const base = item.name || "Unnamed product";
+      const idPart = item.tcgPlayerId ? ` [${item.tcgPlayerId}]` : "";
+      const qtyPart = ` x${item.quantity ?? 0}`;
+      return `• ${base}${idPart}${qtyPart}`;
     });
     let body = lines.join("\n");
     if (body.length > 1800) {
@@ -233,6 +233,16 @@ app.post("/api/inventory", requireAdminAuth, function (req, res) {
     }
     sendDiscordMessage(DISCORD_STOCK_WEBHOOK, header + body);
   }
+
+  res.json({
+    ok: true,
+    totalItems: nextInventory.length,
+    newItems: newItems.map((i) => ({
+      name: i.name,
+      tcgPlayerId: i.tcgPlayerId,
+      quantity: i.quantity,
+    })),
+  });
 });
 
 // ---------- Start server ----------

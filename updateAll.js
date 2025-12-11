@@ -1,4 +1,5 @@
-// updateAll.js
+// updateAll.js - pull from Render → update prices → commit & push
+
 const { execSync } = require("child_process");
 
 function run(cmd) {
@@ -11,26 +12,26 @@ function main() {
     // 1) Pull latest inventory from Render
     run("node pullInventory.js");
 
-    // 2) Update prices locally
-    run("node updateprices.js");
+    // 2) Update prices locally (respects 24h cooldown)
+    run("node updatePrices.js");
 
-    // 3) Stage changes (inventory.json at minimum)
-    run("git add inventory.json");
-
-    // 4) Commit changes if there are any
+    // 3) Commit changes (if any)
     try {
-      run('git commit -m "Update inventory prices"');
+      run('git add inventory.json');
+      run('git commit -m "chore: update inventory prices"');
     } catch (err) {
-      // Most common reason: "nothing to commit, working tree clean"
-      console.log("ℹ No changes to commit (inventory.json already up to date).");
+      console.warn(
+        "⚠ git commit failed (probably no changes to commit):",
+        err.message || err
+      );
     }
 
-    // 5) Push to remote
+    // 4) Push to remote
     try {
       run("git push");
     } catch (err) {
       console.error(
-        "❌ git push failed. Check your remote, auth (GitHub login/SSH), or network."
+        "❌ git push failed. Check your remote, auth (GitHub token/SSH), or network."
       );
       process.exit(1);
     }

@@ -1,179 +1,152 @@
 async function fetchInventory() {
-  const res = await fetch('/api/inventory');
+  const res = await fetch("/api/inventory");
   if (!res.ok) {
-    throw new Error('Failed to fetch inventory');
+    throw new Error("Failed to fetch inventory");
   }
-  return res.json();
+  const data = await res.json();
+
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.items)) return data.items;
+  return [];
 }
 
 function formatCurrency(value) {
-  if (value === null || typeof value !== 'number' || Number.isNaN(value)) {
-    return 'N/A';
+  if (value === null || typeof value !== "number" || Number.isNaN(value)) {
+    return "N/A";
   }
   return `$${value.toFixed(2)}`;
 }
 
-function renderInventory(data) {
-  const grid = document.getElementById('productsGrid');
-  const empty = document.getElementById('emptyState');
+function renderInventory(items) {
+  const grid = document.getElementById("productsGrid");
+  const emptyState = document.getElementById("emptyState");
 
-  grid.innerHTML = '';
+  if (!grid || !emptyState) return;
 
-  const items = (data && data.items) || [];
+  grid.innerHTML = "";
 
-  if (!items.length) {
-    empty.classList.remove('hidden');
+  if (!items || items.length === 0) {
+    emptyState.classList.remove("hidden");
     return;
-  } else {
-    empty.classList.add('hidden');
   }
 
-  for (const item of items) {
-    const card = document.createElement('article');
-    card.className = 'product-card';
+  emptyState.classList.add("hidden");
 
-    const imgWrapper = document.createElement('div');
-    imgWrapper.className = 'product-image-wrapper';
+  items.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "product-card";
 
-    // Quantity badge removed so customers don't see stock count
+    const name = item.name || "Unnamed product";
+    const setName = item.setName || "";
 
-    const img = document.createElement('img');
-    img.className = 'product-image';
-    img.src =
-      item.imageUrl ||
-      'https://via.placeholder.com/400x300?text=No+Image';
-    img.alt = item.name || 'Sealed product';
-    imgWrapper.appendChild(img);
+    card.dataset.name = name.toLowerCase();
+    card.dataset.set = setName.toLowerCase();
 
-    const body = document.createElement('div');
-    body.className = 'product-body';
-
-    const nameEl = document.createElement('div');
-    nameEl.className = 'product-name';
-    nameEl.textContent = item.name || 'Unknown product';
-    body.appendChild(nameEl);
-
-    const setEl = document.createElement('div');
-    setEl.className = 'product-set';
-    setEl.textContent = item.setName || '—';
-    body.appendChild(setEl);
-
-    const priceRow = document.createElement('div');
-    priceRow.className = 'price-row';
-
-    const yourPrice = document.createElement('div');
-    yourPrice.innerHTML = `
-      <div class="price-label">Your price (90% market)</div>
-      <div class="price-value price-your">${formatCurrency(
-        item.yourPrice
-      )}</div>
-    `;
-
-    const marketPrice = document.createElement('div');
-    marketPrice.innerHTML = `
-      <div class="price-label">TCGplayer market</div>
-      <div class="price-market">${formatCurrency(item.marketPrice)}</div>
-    `;
-
-    priceRow.appendChild(yourPrice);
-    priceRow.appendChild(marketPrice);
-    body.appendChild(priceRow);
-
-    const footer = document.createElement('div');
-    footer.className = 'product-footer';
-
-    const tag = document.createElement('div');
-    tag.className = 'tag-pill';
-    tag.textContent = 'Sealed';
-    footer.appendChild(tag);
-
-    if (item.tcgPlayerUrl) {
-      const link = document.createElement('a');
-      link.className = 'link';
-      link.href = item.tcgPlayerUrl;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = 'View on TCGplayer';
-      footer.appendChild(link);
+    const img = document.createElement("img");
+    img.className = "product-image";
+    img.alt = name;
+    img.loading = "lazy";
+    if (item.imageUrl) {
+      img.src = item.imageUrl;
     }
 
-    body.appendChild(footer);
+    const nameEl = document.createElement("h2");
+    nameEl.className = "product-name";
+    nameEl.textContent = name;
 
-const errMsg = item.priceError || item.error;
-if (errMsg) {
-  const errorEl = document.createElement('div');
-  errorEl.className = 'price-label';
-  errorEl.style.color = '#f87171';
-  errorEl.style.marginTop = '0.35rem';
-  errorEl.textContent = errMsg;
-  body.appendChild(errorEl);
+    const setEl = document.createElement("p");
+    setEl.className = "product-set";
+    setEl.textContent = setName;
+
+    const priceRow = document.createElement("p");
+    priceRow.className = "product-price-row";
+    const yourPrice = formatCurrency(item.yourPrice);
+    const marketPrice = formatCurrency(item.marketPrice);
+    priceRow.textContent = `Your price: ${yourPrice} · Market: ${marketPrice}`;
+
+    const metaEl = document.createElement("p");
+    metaEl.className = "product-meta";
+    if (item.lastUpdated) {
+      const d = new Date(item.lastUpdated);
+      if (!Number.isNaN(d.getTime())) {
+        metaEl.textContent =
+          "Updated " + d.toLocaleDateString() + " " + d.toLocaleTimeString();
+      }
+    }
+
+    const elements = [img, nameEl, setEl, priceRow, metaEl];
+
+    if (item.tcgPlayerUrl) {
+      const link = document.createElement("a");
+      link.href = item.tcgPlayerUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.className = "product-link";
+      link.textContent = "View on TCGplayer";
+      elements.push(link);
+    }
+
+    elements.forEach((el) => card.appendChild(el));
+    grid.appendChild(card);
+  });
 }
 
-
-    card.appendChild(imgWrapper);
-    card.appendChild(body);
-    grid.appendChild(card);
+function computeLastUpdatedText(items) {
+  if (!items || items.length === 0) {
+    return "Prices last refreshed: N/A";
   }
+
+  const timestamps = items
+    .map((i) => Date.parse(i.lastUpdated))
+    .filter((t) => !Number.isNaN(t));
+
+  if (!timestamps.length) {
+    return "Prices last refreshed: N/A";
+  }
+
+  const latest = Math.max(...timestamps);
+  const d = new Date(latest);
+  return "Prices last refreshed: " + d.toLocaleString();
 }
 
 function applySearchFilter() {
-  const query = document
-    .getElementById('searchInput')
-    .value.trim()
-    .toLowerCase();
+  const input = document.getElementById("searchInput");
+  const query = (input && input.value ? input.value : "").toLowerCase();
 
-  const cards = document.querySelectorAll('.product-card');
-
+  const cards = document.querySelectorAll(".product-card");
   cards.forEach((card) => {
-    const name = card.querySelector('.product-name').textContent.toLowerCase();
-    const set = card.querySelector('.product-set').textContent.toLowerCase();
+    const name = (card.dataset.name || "").toLowerCase();
+    const set = (card.dataset.set || "").toLowerCase();
 
     if (!query || name.includes(query) || set.includes(query)) {
-      card.style.display = '';
+      card.style.display = "";
     } else {
-      card.style.display = 'none';
+      card.style.display = "none";
     }
   });
 }
 
 async function init() {
-  const lastUpdatedEl = document.getElementById('lastUpdated');
+  const lastUpdatedEl = document.getElementById("lastUpdated");
 
   try {
-    const data = await fetchInventory();
-renderInventory(data);
-
-const items = (data && data.items) || [];
-let latest = null;
-
-for (const item of items) {
-  if (item.lastUpdated) {
-    const t = new Date(item.lastUpdated);
-    if (!Number.isNaN(t.getTime())) {
-      if (!latest || t > latest) {
-        latest = t;
-      }
+    const items = await fetchInventory();
+    renderInventory(items);
+    if (lastUpdatedEl) {
+      lastUpdatedEl.textContent = computeLastUpdatedText(items);
     }
-  }
-}
-
-if (latest) {
-  lastUpdatedEl.textContent = `Prices last refreshed: ${latest.toLocaleString()}`;
-} else {
-  // fallback if nothing has a lastUpdated yet
-  const now = new Date();
-  lastUpdatedEl.textContent = `Prices loaded: ${now.toLocaleString()}`;
-}
-
   } catch (err) {
     console.error(err);
-    lastUpdatedEl.textContent =
-      'Error fetching inventory – check server logs.';
+    if (lastUpdatedEl) {
+      lastUpdatedEl.textContent =
+        "Error fetching inventory – check server logs.";
+    }
   }
 
-  document
-    .getElementById('searchInput')
-    .addEventListener('input', applySearchFilter);
+  const input = document.getElementById("searchInput");
+  if (input) {
+    input.addEventListener("input", applySearchFilter);
+  }
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener("DOMContentLoaded", init);

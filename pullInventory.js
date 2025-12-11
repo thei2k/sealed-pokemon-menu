@@ -12,10 +12,9 @@ async function pull() {
 
   const json = await res.json();
 
-  // The API returns { items: [...] }, but updatePrices.js expects just [...]
+  // Support either raw array or { items: [...] }
   let items;
   if (Array.isArray(json)) {
-    // Just in case you ever point this at /api/raw-inventory or similar
     items = json;
   } else if (json && Array.isArray(json.items)) {
     items = json.items;
@@ -31,6 +30,6 @@ async function pull() {
 }
 
 pull().catch((err) => {
-  console.error("❌ Error pulling inventory:", err);
+  console.error("❌ Error pulling inventory:", err.message || err);
   process.exit(1);
 });
