@@ -17,6 +17,11 @@ const cron = require("node-cron");
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const JUSTTCG_API_KEY = process.env.JUSTTCG_API_KEY;
 
+if (typeof fetch !== "function") {
+  console.error("Node 18+ required (fetch built-in).");
+  process.exit(1);
+}
+
 if (!DISCORD_BOT_TOKEN) {
   console.error("Missing DISCORD_BOT_TOKEN in .env");
   process.exit(1);
@@ -31,12 +36,10 @@ if (!JUSTTCG_API_KEY) {
 
 const PORTFOLIO_PATH = path.join(__dirname, "userPortfolios.json");
 const CMD_PREFIX = "!";
-const BATCH_SIZE = 20; // your JustTCG plan limit
+const BATCH_SIZE = 20; // JustTCG plan limit
 
-// ---- Cooldown Settings ----
-
-// 2 hours for normal users
-const ON_DEMAND_COOLDOWN_MS = 2 * 60 * 60 * 1000; // 2 hours
+// Cooldown: 2 hours for normal users (admins bypass)
+const ON_DEMAND_COOLDOWN_MS = 2 * 60 * 60 * 1000;
 const lastOnDemandRun = {}; // { userId: timestamp }
 
 // ---- DISCORD CLIENT ----
@@ -72,7 +75,7 @@ if (!fs.existsSync(PORTFOLIO_PATH)) {
   savePortfolios({});
 }
 
-// ---- JUSTTCG HELPER ----
+// ---- JUSTTCG HELPER (mirrors updatePrices.js logic) ----
 
 async function fetchCardPrices(tcgplayerIds) {
   if (!tcgplayerIds.length) return {};
@@ -90,10 +93,14 @@ async function fetchCardPrices(tcgplayerIds) {
       const res = await fetch("https://api.justtcg.com/v1/cards", {
         method: "POST",
         headers: {
+          "X-Api-Key": JUSTTCG_API_KEY,
           "Content-Type": "application/json",
-          Authorization: `Bearer ${JUSTTCG_API_KEY}`,
         },
-        body: JSON.stringify(chunk.map((id) => ({ tcgplayerId: id }))),
+        body: JSON.stringify(
+          chunk.map((id) => ({
+            tcgplayerId: id,
+          }))
+        ),
       });
 
       if (!res.ok) {
@@ -101,32 +108,60 @@ async function fetchCardPrices(tcgplayerIds) {
         continue;
       }
 
-      const data = await res.json();
-      if (!Array.isArray(data)) {
-        console.error("Unexpected JustTCG response format (expected array)");
+      const result = await res.json();
+
+      // Handle both array and { data: [...] } like updatePrices.js
+      let cards;
+      if (Array.isArray(result)) {
+        cards = result;
+      } else if (result && Array.isArray(result.data)) {
+        cards = result.data;
+      } else {
+        console.error(
+          "Unexpected JustTCG response format, expected array or { data: [...] }."
+        );
+        console.error("Raw response shape keys:", result && Object.keys(result));
         continue;
       }
 
-      for (const entry of data) {
-        if (!entry || !entry.tcgplayerId || !Array.isArray(entry.variants))
+      for (const card of cards) {
+        if (!card || !card.tcgplayerId) continue;
+
+        const id = String(card.tcgplayerId);
+
+        // Match updatePrices.js logic:
+        // sealed variant (condition === "Sealed") OR first variant
+        const variants = card.variants || [];
+        let variant =
+          variants.find((v) => v && v.condition === "Sealed") || variants[0];
+
+        if (!variant || variant.price == null) {
+          idToPrice[id] = {
+            marketPrice: null,
+            setName: card.set_name || null,
+            name: card.name || null,
+          };
           continue;
+        }
 
-        const sealedVariant = entry.variants.find(
-          (v) =>
-            v &&
-            typeof v.condition === "string" &&
-            v.condition.toLowerCase() === "sealed"
-        );
+        const price = Number(variant.price);
+        if (
+          !Number.isFinite(price) ||
+          price <= 0 ||
+          price > 10000
+        ) {
+          idToPrice[id] = {
+            marketPrice: null,
+            setName: card.set_name || null,
+            name: card.name || null,
+          };
+          continue;
+        }
 
-        const marketPrice =
-          sealedVariant && typeof sealedVariant.price === "number"
-            ? sealedVariant.price
-            : null;
-
-        idToPrice[String(entry.tcgplayerId)] = {
-          marketPrice,
-          setName: entry.set_name || null,
-          name: entry.name || null,
+        idToPrice[id] = {
+          marketPrice: price,
+          setName: card.set_name || null,
+          name: card.name || null,
         };
       }
     } catch (err) {
@@ -250,7 +285,7 @@ async function handleInventoryRemove(message, argsStr) {
   );
 }
 
-// !inventorynow – on-demand price fetch for this user
+// !inventorynow – on-demand price fetch for this user (2h cooldown, admin override)
 async function handleInventoryNow(message) {
   const userId = message.author.id;
   const now = Date.now();
