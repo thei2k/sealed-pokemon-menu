@@ -1,5 +1,6 @@
 // discordBot.js
-// Discord bot that lets users track TCGplayer IDs and get daily + on-demand DM price updates.
+// Discord bot that lets users track TCGplayer IDs and get daily + on-demand DM price updates,
+// with server/user-based access control.
 
 require("dotenv").config();
 const fs = require("fs");
@@ -17,18 +18,30 @@ const cron = require("node-cron");
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const JUSTTCG_API_KEY = process.env.JUSTTCG_API_KEY;
 
+const ALLOWED_GUILD_IDS = process.env.ALLOWED_GUILD_IDS
+  ? process.env.ALLOWED_GUILD_IDS.split(",")
+      .map((id) => id.trim())
+      .filter(Boolean)
+  : [];
+
+const ALLOWED_USER_IDS = process.env.ALLOWED_USER_IDS
+  ? process.env.ALLOWED_USER_IDS.split(",")
+      .map((id) => id.trim())
+      .filter(Boolean)
+  : [];
+
 if (typeof fetch !== "function") {
   console.error("Node 18+ required (fetch built-in).");
   process.exit(1);
 }
 
 if (!DISCORD_BOT_TOKEN) {
-  console.error("Missing DISCORD_BOT_TOKEN in .env");
+  console.error("Missing DISCORD_BOT_TOKEN in environment.");
   process.exit(1);
 }
 
 if (!JUSTTCG_API_KEY) {
-  console.error("Missing JUSTTCG_API_KEY in .env");
+  console.error("Missing JUSTTCG_API_KEY in environment.");
   process.exit(1);
 }
 
@@ -38,7 +51,7 @@ const PORTFOLIO_PATH = path.join(__dirname, "userPortfolios.json");
 const CMD_PREFIX = "!";
 const BATCH_SIZE = 20; // JustTCG plan limit
 
-// Cooldown: 2 hours for normal users (admins bypass)
+// Cooldown: 2 hours for normal users (server admins bypass)
 const ON_DEMAND_COOLDOWN_MS = 2 * 60 * 60 * 1000;
 const lastOnDemandRun = {}; // { userId: timestamp }
 
@@ -54,84 +67,108 @@ const client = new Client({
   partials: [Partials.Channel],
 });
 
+// ---- ACCESS CONTROL HELPERS ----
+//
+// By default (no ALLOWED_GUILD_IDS / ALLOWED_USER_IDS set), the bot
+// behaves as before and is usable anywhere. Once you configure either
+// env var, only those guilds/users will be allowed.
+
+function isUserAllowed(message) {
+  const userId = message.author.id;
+
+  // If no allow lists are configured, allow everyone (backwards compatible).
+  if (ALLOWED_GUILD_IDS.length === 0 && ALLOWED_USER_IDS.length === 0) {
+    return true;
+  }
+
+  // Explicit per-user allow list (works for DMs and guilds).
+  if (ALLOWED_USER_IDS.includes(userId)) {
+    return true;
+  }
+
+  // Guild messages: only allow if guild is whitelisted.
+  if (message.guild) {
+    const guildId = message.guild.id;
+    return ALLOWED_GUILD_IDS.includes(guildId);
+  }
+
+  // DM from non-allowed user: blocked.
+  return false;
+}
+
 // ---- STORAGE HELPERS ----
 
 function loadPortfolios() {
   try {
+    if (!fs.existsSync(PORTFOLIO_PATH)) {
+      fs.writeFileSync(PORTFOLIO_PATH, JSON.stringify({}, null, 2), "utf8");
+      return {};
+    }
     const raw = fs.readFileSync(PORTFOLIO_PATH, "utf8");
-    const data = JSON.parse(raw);
-    return data && typeof data === "object" ? data : {};
-  } catch {
+    if (!raw.trim()) return {};
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error("Failed to load portfolios:", err);
     return {};
   }
 }
 
 function savePortfolios(portfolios) {
-  fs.writeFileSync(PORTFOLIO_PATH, JSON.stringify(portfolios, null, 2), "utf8");
-}
-
-// Ensure file exists
-if (!fs.existsSync(PORTFOLIO_PATH)) {
-  savePortfolios({});
+  try {
+    fs.writeFileSync(PORTFOLIO_PATH, JSON.stringify(portfolios, null, 2), "utf8");
+  } catch (err) {
+    console.error("Failed to save portfolios:", err);
+  }
 }
 
 // ---- JUSTTCG HELPER (mirrors updatePrices.js logic) ----
 
 async function fetchCardPrices(tcgplayerIds) {
-  if (!tcgplayerIds.length) return {};
+  // Deduplicate IDs and normalize to strings
+  const uniqueIds = Array.from(
+    new Set(
+      (tcgplayerIds || [])
+        .map((id) => String(id).trim())
+        .filter((id) => id.length > 0)
+    )
+  );
 
-  const uniqueIds = Array.from(new Set(tcgplayerIds.map(String)));
-  const idToPrice = {};
+  const idToPrice = {}; // id -> { marketPrice, setName, name }
 
+  if (!uniqueIds.length) {
+    return idToPrice;
+  }
+
+  // Chunk into batches of BATCH_SIZE
   for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
-    const chunk = uniqueIds.slice(i, i + BATCH_SIZE);
-    console.log(
-      `Fetching prices for batch ${i / BATCH_SIZE + 1}: ${chunk.length} IDs`
-    );
+    const batch = uniqueIds.slice(i, i + BATCH_SIZE);
 
     try {
       const res = await fetch("https://api.justtcg.com/v1/cards", {
         method: "POST",
         headers: {
-          "X-Api-Key": JUSTTCG_API_KEY,
           "Content-Type": "application/json",
+          "X-Api-Key": JUSTTCG_API_KEY,
         },
-        body: JSON.stringify(
-          chunk.map((id) => ({
-            tcgplayerId: id,
-          }))
-        ),
+        body: JSON.stringify({ tcgplayerIds: batch }),
       });
 
       if (!res.ok) {
-        console.error("JustTCG batch failed:", res.status, await res.text());
+        console.error(
+          `JustTCG batch request failed: ${res.status} ${res.statusText}`
+        );
         continue;
       }
 
       const result = await res.json();
-
-      // Handle both array and { data: [...] } like updatePrices.js
-      let cards;
-      if (Array.isArray(result)) {
-        cards = result;
-      } else if (result && Array.isArray(result.data)) {
-        cards = result.data;
-      } else {
-        console.error(
-          "Unexpected JustTCG response format, expected array or { data: [...] }."
-        );
-        console.error("Raw response shape keys:", result && Object.keys(result));
-        continue;
-      }
+      const cards = Array.isArray(result) ? result : result.data || [];
 
       for (const card of cards) {
-        if (!card || !card.tcgplayerId) continue;
+        if (!card || !card.tcgplayer_id) continue;
 
-        const id = String(card.tcgplayerId);
-
-        // Match updatePrices.js logic:
-        // sealed variant (condition === "Sealed") OR first variant
+        const id = String(card.tcgplayer_id);
         const variants = card.variants || [];
+
         let variant =
           variants.find((v) => v && v.condition === "Sealed") || variants[0];
 
@@ -145,11 +182,7 @@ async function fetchCardPrices(tcgplayerIds) {
         }
 
         const price = Number(variant.price);
-        if (
-          !Number.isFinite(price) ||
-          price <= 0 ||
-          price > 10000
-        ) {
+        if (!Number.isFinite(price) || price <= 0 || price > 10000) {
           idToPrice[id] = {
             marketPrice: null,
             setName: card.set_name || null,
@@ -165,7 +198,7 @@ async function fetchCardPrices(tcgplayerIds) {
         };
       }
     } catch (err) {
-      console.error("Error calling JustTCG:", err.message || err);
+      console.error("Error during JustTCG request:", err);
     }
   }
 
@@ -174,291 +207,245 @@ async function fetchCardPrices(tcgplayerIds) {
 
 // ---- COMMAND HANDLERS ----
 
-// !inventoryadd 123456 "Booster Box" 123123 "Booster Bundle"
+// !inventoryadd <id> "Label" [<id> "Label"...]
 async function handleInventoryAdd(message, argsStr) {
-  const userId = message.author.id;
-  const portfolios = loadPortfolios();
+  if (!argsStr) {
+    return message.reply(
+      "Usage: `!inventoryadd <tcgplayerId> \"Label\" [<tcgplayerId> \"Label\" ...]`"
+    );
+  }
 
-  // Parse pairs: number "label"
+  const pairs = [];
   const regex = /(\d+)\s+"([^"]+)"/g;
   let match;
-  const entries = [];
-
   while ((match = regex.exec(argsStr)) !== null) {
     const id = match[1];
     const label = match[2].trim();
     if (id && label) {
-      entries.push({ tcgplayerId: id, label });
+      pairs.push({ id, label });
     }
   }
 
-  if (!entries.length) {
+  if (!pairs.length) {
     return message.reply(
-      'Usage: `!inventoryadd 543843 "Phantasmal Flames Booster Box" 543844 "Booster Bundle"`'
+      "I couldn't parse any `<id> \"Label\"` pairs. Example:\n" +
+        "`!inventoryadd 543843 \"Booster Box\" 543844 \"Booster Bundle\"`"
     );
   }
 
-  if (!portfolios[userId]) {
-    portfolios[userId] = [];
-  }
+  const userId = message.author.id;
+  const portfolios = loadPortfolios();
+  const current = portfolios[userId] || [];
 
-  const current = portfolios[userId];
-
-  for (const entry of entries) {
-    const existingIndex = current.findIndex(
-      (e) => String(e.tcgplayerId) === String(entry.tcgplayerId)
-    );
-    if (existingIndex >= 0) {
-      current[existingIndex].label = entry.label;
+  for (const { id, label } of pairs) {
+    const existingIndex = current.findIndex((item) => item.id === id);
+    if (existingIndex !== -1) {
+      current[existingIndex].label = label;
     } else {
-      current.push(entry);
+      current.push({ id, label });
     }
   }
 
+  portfolios[userId] = current;
   savePortfolios(portfolios);
 
-  const summary = entries
-    .map((e) => `${e.label} (${e.tcgplayerId})`)
-    .join(", ");
-
+  const addedList = pairs.map((p) => `${p.id} – "${p.label}"`).join("\n");
   await message.reply(
-    `✅ Added/updated the following in your watchlist: ${summary}`
+    `✅ Updated your watchlist with:\n${addedList}\n\nYou now have ${current.length} item(s) tracked.`
   );
 }
 
+// !inventorylist – DM the user their current list (with latest prices)
 async function handleInventoryList(message) {
   const userId = message.author.id;
   const portfolios = loadPortfolios();
   const list = portfolios[userId] || [];
 
   if (!list.length) {
-    return message.reply(
-      "📭 You don't have anything in your watchlist yet. Add items with `!inventoryadd`."
+    return message.reply("You don't have any items in your watchlist yet.");
+  }
+
+  const ids = list.map((item) => item.id);
+  const prices = await fetchCardPrices(ids);
+
+  let lines = [];
+  for (const item of list) {
+    const p = prices[item.id] || {};
+    const name = p.name || item.label || "(unknown)";
+    const setName = p.setName ? ` [${p.setName}]` : "";
+    const priceText =
+      p.marketPrice != null ? `$${p.marketPrice.toFixed(2)}` : "N/A";
+
+    lines.push(
+      `• ${name}${setName}\n  ID: ${item.id} – ${item.label} – Market: ${priceText}`
     );
   }
 
-  const lines = list.map(
-    (e, idx) => `${idx + 1}. ${e.label || "No label"} (${e.tcgplayerId})`
-  );
-
-  const chunks = [];
-  let current = "";
-  for (const line of lines) {
-    if ((current + line + "\n").length > 1800) {
-      chunks.push(current);
-      current = "";
+  try {
+    await message.author.send(
+      `📊 Your tracked items:\n\n` + lines.join("\n\n")
+    );
+    if (message.channel.type !== 1) {
+      // If not already DM, acknowledge in-channel.
+      await message.reply("I've sent you a DM with your watchlist.");
     }
-    current += line + "\n";
-  }
-  if (current) chunks.push(current);
-
-  for (const chunk of chunks) {
-    await message.author.send(`📋 Your watchlist:\n\n${chunk}`);
-  }
-
-  if (chunks.length === 1) {
-    await message.reply("✅ I've sent your current watchlist via DM.");
-  } else {
+  } catch (err) {
+    console.error("Failed to DM user list:", err);
     await message.reply(
-      `✅ I've sent your current watchlist in ${chunks.length} DMs.`
+      "I couldn't DM you. Please make sure your DMs are open and try again."
     );
   }
 }
 
-// !inventoryremove 123456
+// !inventoryremove <id>
 async function handleInventoryRemove(message, argsStr) {
   const userId = message.author.id;
-  const portfolios = loadPortfolios();
-  const list = portfolios[userId] || [];
+  const id = argsStr.trim();
 
-  const id = (argsStr || "").trim();
   if (!id) {
-    return message.reply('Usage: `!inventoryremove 543843`');
+    return message.reply("Usage: `!inventoryremove <tcgplayerId>`");
   }
 
-  const next = list.filter((e) => String(e.tcgplayerId) !== id);
+  const portfolios = loadPortfolios();
+  const current = portfolios[userId] || [];
+  const next = current.filter((item) => item.id !== id);
+  const removedCount = current.length - next.length;
+
   portfolios[userId] = next;
   savePortfolios(portfolios);
 
+  if (!removedCount) {
+    return message.reply(
+      `I didn't find ID \`${id}\` in your watchlist. You currently have ${next.length} item(s).`
+    );
+  }
+
   await message.reply(
-    `🗑 If that ID was in your watchlist, it's been removed. You now have ${next.length} item(s).`
+    `🗑 Removed ID \`${id}\` from your watchlist. You now have ${next.length} item(s).`
   );
 }
 
-// !inventorynow – on-demand price fetch for this user (2h cooldown, admin override)
+// !inventorynow – on-demand price fetch for this user (2h cooldown, server admin override)
 async function handleInventoryNow(message) {
   const userId = message.author.id;
   const now = Date.now();
 
   // Determine if user is admin (server admin only)
-  const isAdmin =
-    message.member &&
-    message.member.permissions &&
-    message.member.permissions.has(PermissionsBitField.Flags.Administrator);
+  let isAdmin = false;
+  if (message.guild && message.member) {
+    try {
+      isAdmin = message.member.permissions.has(
+        PermissionsBitField.Flags.Administrator
+      );
+    } catch (err) {
+      isAdmin = false;
+    }
+  }
 
-  // Cooldown check (only applies to non-admins)
   if (!isAdmin) {
-    const last = lastOnDemandRun[userId] || 0;
-    const diff = now - last;
-
-    if (diff < ON_DEMAND_COOLDOWN_MS) {
-      const remainingMs = ON_DEMAND_COOLDOWN_MS - diff;
+    const lastRun = lastOnDemandRun[userId] || 0;
+    const elapsed = now - lastRun;
+    if (elapsed < ON_DEMAND_COOLDOWN_MS) {
+      const remainingMs = ON_DEMAND_COOLDOWN_MS - elapsed;
       const remainingMin = Math.ceil(remainingMs / 60000);
       return message.reply(
         `⏳ You can only use \`!inventorynow\` every 2 hours. Please try again in ~${remainingMin} minute(s).`
       );
     }
 
-    // Update normal-user cooldown
     lastOnDemandRun[userId] = now;
   }
 
-  // Load user's watchlist
   const portfolios = loadPortfolios();
   const list = portfolios[userId] || [];
 
   if (!list.length) {
     return message.reply(
-      "📭 Your watchlist is empty. Add items first with `!inventoryadd`."
+      "You don't have any items in your watchlist yet. Use `!inventoryadd` first."
     );
   }
 
-  await message.reply("📡 Fetching the latest live prices…");
+  const ids = list.map((item) => item.id);
+  const prices = await fetchCardPrices(ids);
 
-  const ids = list.map((e) => String(e.tcgplayerId));
-  const idToPrice = await fetchCardPrices(ids);
-
-  const lines = list.map((entry) => {
-    const info = idToPrice[String(entry.tcgplayerId)] || {};
-    const price = info.marketPrice;
-    const setName = info.setName || "";
-    const name = info.name || "";
-    const label = entry.label || name || entry.tcgplayerId;
-
+  let lines = [];
+  for (const item of list) {
+    const p = prices[item.id] || {};
+    const name = p.name || item.label || "(unknown)";
+    const setName = p.setName ? ` [${p.setName}]` : "";
     const priceText =
-      typeof price === "number" ? `$${price.toFixed(2)}` : "N/A";
+      p.marketPrice != null ? `$${p.marketPrice.toFixed(2)}` : "N/A";
 
-    return `• **${label}** (${entry.tcgplayerId}) — ${priceText}${
-      setName ? ` [${setName}]` : ""
-    }`;
-  });
+    lines.push(
+      `• ${name}${setName}\n  ID: ${item.id} – ${item.label} – Market: ${priceText}`
+    );
+  }
 
   try {
-    const user = await client.users.fetch(userId);
-
-    let header = "📊 **Your latest TCG price updates:**\n\n";
-    let messageText = header;
-
-    for (const line of lines) {
-      if ((messageText + line + "\n").length > 1800) {
-        await user.send(messageText);
-        messageText = header;
-      }
-      messageText += line + "\n";
-    }
-
-    if (messageText !== header) {
-      await user.send(messageText);
-    }
-
-    if (isAdmin) {
-      await message.reply("✅ Admin override used. Latest prices sent via DM.");
-    } else {
-      await message.reply("📬 I’ve sent you your updated prices in DM!");
+    await message.author.send(
+      `⚡ On-demand price check:\n\n` + lines.join("\n\n")
+    );
+    if (message.channel.type !== 1) {
+      await message.reply("I've sent you a DM with your latest prices.");
     }
   } catch (err) {
-    console.error("Failed to DM user for inventorynow:", err.message || err);
+    console.error("Failed to DM user now-prices:", err);
     await message.reply(
-      "⚠ I couldn't DM you. Make sure your DMs are open so I can send updates."
+      "I couldn't DM you. Please make sure your DMs are open and try again."
     );
   }
 }
 
-// ---- DAILY JOB ----
+// ---- DAILY CRON JOB (10:00) ----
 
-async function sendDailyUpdates() {
-  console.log("Running daily price update job...");
-
+cron.schedule("0 10 * * *", async () => {
+  console.log("[Cron] Running daily price updates for all users...");
   const portfolios = loadPortfolios();
-  const userIds = Object.keys(portfolios).filter(
-    (id) => Array.isArray(portfolios[id]) && portfolios[id].length > 0
-  );
+  const entries = Object.entries(portfolios);
 
-  if (!userIds.length) {
-    console.log("No users with portfolios, skipping.");
+  if (!entries.length) {
+    console.log("[Cron] No users in portfolios, skipping.");
     return;
   }
 
-  // Flatten all entries
-  const allEntries = [];
-  for (const userId of userIds) {
-    for (const entry of portfolios[userId]) {
-      allEntries.push({
-        userId,
-        tcgplayerId: String(entry.tcgplayerId),
-        label: entry.label || "",
-      });
+  const allIds = Array.from(
+    new Set(
+      entries
+        .flatMap(([userId, items]) => (items || []).map((item) => item.id))
+        .filter(Boolean)
+        .map((id) => String(id))
+    )
+  );
+
+  const prices = await fetchCardPrices(allIds);
+
+  for (const [userId, items] of entries) {
+    if (!items || !items.length) continue;
+
+    const userItems = items;
+    let lines = [];
+
+    for (const item of userItems) {
+      const p = prices[item.id] || {};
+      const name = p.name || item.label || "(unknown)";
+      const setName = p.setName ? ` [${p.setName}]` : "";
+      const priceText =
+        p.marketPrice != null ? `$${p.marketPrice.toFixed(2)}` : "N/A";
+
+      lines.push(
+        `• ${name}${setName}\n  ID: ${item.id} – ${item.label} – Market: ${priceText}`
+      );
     }
-  }
 
-  const allIds = allEntries.map((e) => e.tcgplayerId);
-  const idToPrice = await fetchCardPrices(allIds);
-
-  // Build per-user messages
-  const perUserLines = {};
-  for (const entry of allEntries) {
-    const info = idToPrice[entry.tcgplayerId] || {};
-    const price = info.marketPrice;
-    const setName = info.setName || "";
-    const name = info.name || "";
-    const label = entry.label || name || entry.tcgplayerId;
-
-    const priceText =
-      typeof price === "number" ? `$${price.toFixed(2)}` : "N/A";
-
-    const line = `• ${label} (${entry.tcgplayerId}) — ${priceText}${
-      setName ? ` [${setName}]` : ""
-    }`;
-
-    if (!perUserLines[entry.userId]) perUserLines[entry.userId] = [];
-    perUserLines[entry.userId].push(line);
-  }
-
-  // Send DMs
-  for (const userId of Object.keys(perUserLines)) {
     try {
       const user = await client.users.fetch(userId);
-      const lines = perUserLines[userId];
-
-      let header = "📊 **Today's price updates for your watchlist:**\n\n";
-      let messageText = header;
-
-      for (const line of lines) {
-        if ((messageText + line + "\n").length > 1900) {
-          await user.send(messageText);
-          messageText = header;
-        }
-        messageText += line + "\n";
-      }
-
-      if (messageText !== header) {
-        await user.send(messageText);
-      }
-
-      console.log("Sent daily update to user", userId);
+      await user.send(
+        `📅 Daily price update:\n\n` + lines.join("\n\n")
+      );
     } catch (err) {
-      console.error("Failed to DM user", userId, err.message || err);
+      console.error(`Failed to DM daily update to user ${userId}:`, err);
     }
   }
-
-  console.log("Daily price update job done.");
-}
-
-// Schedule: once per day at 10:00 AM server time
-cron.schedule("0 10 * * *", () => {
-  sendDailyUpdates().catch((err) =>
-    console.error("Daily job error:", err.message || err)
-  );
 });
 
 // ---- MESSAGE HANDLER ----
@@ -466,6 +453,19 @@ cron.schedule("0 10 * * *", () => {
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(CMD_PREFIX)) return;
+
+  // Access control: block unauthorized users/servers.
+  if (!isUserAllowed(message)) {
+    // If you prefer total silence for blocked users, comment this out.
+    try {
+      await message.reply(
+        "Sorry, this bot is currently restricted and you are not authorized to use it."
+      );
+    } catch (err) {
+      console.error("Failed to send unauthorized message:", err);
+    }
+    return;
+  }
 
   const withoutPrefix = message.content.slice(CMD_PREFIX.length).trim();
   const firstSpace = withoutPrefix.indexOf(" ");
@@ -487,15 +487,20 @@ client.on("messageCreate", async (message) => {
       await handleInventoryNow(message);
     }
   } catch (err) {
-    console.error("Command error:", err.message || err);
-    message.reply("❌ Something went wrong handling that command.");
+    console.error("Error handling command:", err);
+    try {
+      await message.reply(
+        "Something went wrong while processing that command. Please try again later."
+      );
+    } catch (_) {
+      // ignore
+    }
   }
 });
 
-// ---- LOGIN ----
+// ---- READY / LOGIN ----
 
-// Use clientReady to avoid the deprecation warning about "ready"
-client.once("clientReady", () => {
+client.once("ready", () => {
   console.log(`Bot logged in as ${client.user.tag}`);
   console.log("Daily job scheduled at 10:00.");
 });
