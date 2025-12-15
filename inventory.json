@@ -1,5 +1,17 @@
 [
   {
+    "name": "Mega Evolution Booster Box",
+    "setName": "ME01: Mega Evolution",
+    "quantity": 1,
+    "marketPrice": 229.44,
+    "yourPrice": 206.5,
+    "lastUpdated": "2025-12-15T22:02:22.799Z",
+    "tcgPlayerId": "644298",
+    "tcgPlayerUrl": "https://www.tcgplayer.com/product/644298",
+    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644298.jpg",
+    "game": null
+  },
+  {
     "name": "Avatar: The Last Airbender - Beginner Box",
     "setName": "Avatar: The Last Airbender",
     "quantity": 1,
@@ -57,18 +69,6 @@
     "tcgPlayerId": "557256",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/557256",
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/557256.jpg",
-    "game": "mtg"
-  },
-  {
-    "name": "Modern Horizons 3 Commander Deck Display",
-    "setName": "Commander: Modern Horizons 3",
-    "quantity": 2,
-    "marketPrice": 178.34,
-    "yourPrice": 160.51,
-    "lastUpdated": "2025-12-15T21:59:44.785Z",
-    "tcgPlayerId": "541196",
-    "tcgPlayerUrl": "https://www.tcgplayer.com/product/541196",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/541196.jpg",
     "game": "mtg"
   },
   {
@@ -153,18 +153,6 @@
     "tcgPlayerId": "644279",
     "tcgPlayerUrl": "https://www.tcgplayer.com/product/644279",
     "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644279.jpg",
-    "game": null
-  },
-  {
-    "name": "Mega Evolution Enhanced Booster Box",
-    "setName": "ME01: Mega Evolution",
-    "quantity": 1,
-    "marketPrice": 221.61,
-    "yourPrice": 199.45,
-    "lastUpdated": "2025-12-15T21:59:44.787Z",
-    "tcgPlayerId": "644300",
-    "tcgPlayerUrl": "https://www.tcgplayer.com/product/644300",
-    "imageUrl": "https://product-images.tcgplayer.com/fit-in/437x437/644300.jpg",
     "game": null
   },
   {
