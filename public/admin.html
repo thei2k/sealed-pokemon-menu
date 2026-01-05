@@ -17,7 +17,7 @@
           <div class="hero-text">
             <h1 class="page-title">Admin – Inventory Editor</h1>
             <p class="page-subtitle">
-              Edit sealed inventory, TCGplayer IDs, quantity, and game type.
+              Default pricing is <strong>90%</strong> of market. Set a per-item Pricing % to override.
             </p>
           </div>
         </div>
@@ -26,19 +26,10 @@
       <main>
         <div class="toolbar">
           <div class="toolbar-left">
-            <button id="loadCurrentBtn" class="button" type="button">
-              Load current inventory
-            </button>
-            <button id="addRowBtn" class="button" type="button">
-              Add row
-            </button>
-            <button id="saveBtn" class="button" type="button">
-              Save changes
-            </button>
-
-            <button id="exportCollectrBtn" class="button" type="button">
-              Export Collectr CSV
-            </button>
+            <button id="loadCurrentBtn" class="button" type="button">Load current inventory</button>
+            <button id="addRowBtn" class="button" type="button">Add row</button>
+            <button id="saveBtn" class="button" type="button">Save changes</button>
+            <button id="exportCollectrBtn" class="button" type="button">Export Collectr CSV</button>
           </div>
           <div class="toolbar-right">
             <span id="adminStatus" class="status-message"></span>
@@ -52,6 +43,7 @@
               <th>TCGplayer ID</th>
               <th>Quantity</th>
               <th>Game</th>
+              <th>Pricing %</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -62,13 +54,7 @@
       <footer class="app-footer">
         <p>
           Admin panel · Changes save to inventory.json ·
-          <a
-            href="https://discord.gg/sqXVguMCyv"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Join the Discord
-          </a>
+          <a href="https://discord.gg/sqXVguMCyv" target="_blank" rel="noopener noreferrer">Join the Discord</a>
         </p>
       </footer>
     </div>

@@ -1,10 +1,5 @@
 // server.js - No live JustTCG calls.
 // Serves inventory + admin with Discord stock alerts.
-//
-// Phase 1 hardening included:
-//  1) Inventory schema + normalization via inventoryStore.js
-//  2) Atomic writes (temp + rename)
-//  3) Automatic backups (keeps latest snapshots)
 
 require("dotenv").config();
 const express = require("express");
@@ -24,10 +19,7 @@ const DISCORD_STOCK_WEBHOOK = process.env.DISCORD_STOCK_WEBHOOK;
 
 const INVENTORY_PATH = path.join(__dirname, "inventory.json");
 
-// Parse JSON bodies for admin POST
 app.use(express.json());
-
-// ---------- Helpers ----------
 
 function sendDiscordMessage(webhookUrl, content) {
   if (!webhookUrl || !content) return;
@@ -39,13 +31,9 @@ function sendDiscordMessage(webhookUrl, content) {
     body: JSON.stringify({ content }),
   })
     .then((res) => {
-      if (!res.ok) {
-        console.error("Discord webhook failed with status", res.status);
-      }
+      if (!res.ok) console.error("Discord webhook failed with status", res.status);
     })
-    .catch((err) => {
-      console.error("Discord webhook error:", err.message || err);
-    });
+    .catch((err) => console.error("Discord webhook error:", err.message || err));
 }
 
 function requireAdmin(req, res, next) {
@@ -55,7 +43,6 @@ function requireAdmin(req, res, next) {
   }
 
   const authHeader = req.headers["authorization"];
-
   if (!authHeader || !authHeader.startsWith("Basic ")) {
     res.setHeader("WWW-Authenticate", 'Basic realm="Admin Area"');
     return res.status(401).send("Authentication required.");
@@ -66,32 +53,20 @@ function requireAdmin(req, res, next) {
   const idx = decoded.indexOf(":");
   const pass = idx >= 0 ? decoded.slice(idx + 1) : "";
 
-  // User name is ignored; only password matters
-  if (pass !== ADMIN_PASSWORD) {
-    return res.status(403).send("Forbidden");
-  }
-
+  if (pass !== ADMIN_PASSWORD) return res.status(403).send("Forbidden");
   next();
 }
 
-// ---------- Routes ----------
-
-// Protect /admin.html explicitly BEFORE static middleware
 app.get("/admin.html", requireAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 
-// Static frontend (index.html, JS, CSS, etc.)
 app.use(express.static(path.join(__dirname, "public")));
 
-// GET /api/inventory – public view (quantity > 0, sorted)
 app.get("/api/inventory", (req, res) => {
   const inv = loadInventoryItems(INVENTORY_PATH);
-
-  // Only show items you have
   const filtered = inv.filter((i) => (i.quantity ?? 0) > 0);
 
-  // Sort by setName then name (stable and consistent)
   filtered.sort((a, b) => {
     const setA = (a.setName || "").toLowerCase();
     const setB = (b.setName || "").toLowerCase();
@@ -108,13 +83,11 @@ app.get("/api/inventory", (req, res) => {
   res.json(filtered);
 });
 
-// GET /api/raw-inventory – admin view (everything)
 app.get("/api/raw-inventory", requireAdmin, (req, res) => {
   const inv = loadInventoryItems(INVENTORY_PATH);
   res.json(inv);
 });
 
-// POST /api/inventory – admin save + Discord new-stock alert
 app.post("/api/inventory", requireAdmin, (req, res) => {
   const payload = req.body;
 
@@ -139,15 +112,21 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
   for (const row of payload) {
     if (!row) continue;
 
-    const nameRaw = row.name || "";
-    const idRaw = row.tcgPlayerId || "";
-    const qtyRaw = row.quantity;
-    const gameRaw = (row.game || "").trim().toLowerCase();
+    const name = String(row.name || "").trim();
+    const tcgId = String(row.tcgPlayerId || "").trim();
 
-    const name = typeof nameRaw === "string" ? nameRaw.trim() : String(nameRaw || "").trim();
-    const tcgId = typeof idRaw === "string" ? idRaw.trim() : String(idRaw || "").trim();
+    // allow pricingPercent from admin (optional)
+    const pricingRaw = row.pricingPercent;
+    let pricingPercent = null;
+    if (pricingRaw !== null && pricingRaw !== undefined && pricingRaw !== "") {
+      const n = Number(pricingRaw);
+      if (Number.isFinite(n)) {
+        pricingPercent = Math.max(1, Math.min(200, Math.round(n * 100) / 100));
+      }
+    }
 
     let quantity = 0;
+    const qtyRaw = row.quantity;
     if (qtyRaw === "" || qtyRaw === null || qtyRaw === undefined) {
       quantity = 0;
     } else {
@@ -155,24 +134,13 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
       quantity = Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0;
     }
 
-    // Normalize game text a bit
+    const gameRaw = String(row.game || "").trim().toLowerCase();
     let game = null;
-    if (gameRaw === "pokemon" || gameRaw === "pokémon" || gameRaw === "poke") {
-      game = "pokemon";
-    } else if (
-      gameRaw === "magic" ||
-      gameRaw === "mtg" ||
-      gameRaw === "magic: the gathering"
-    ) {
-      game = "mtg";
-    } else if (gameRaw === "other" || gameRaw === "misc") {
-      game = "other";
-    } else if (gameRaw) {
-      // Store whatever they typed if it's not empty
-      game = gameRaw;
-    }
+    if (gameRaw === "pokemon" || gameRaw === "pokémon" || gameRaw === "poke") game = "pokemon";
+    else if (gameRaw === "magic" || gameRaw === "mtg" || gameRaw === "magic: the gathering") game = "mtg";
+    else if (gameRaw === "other" || gameRaw === "misc") game = "other";
+    else if (gameRaw) game = gameRaw;
 
-    // Skip rows that are effectively empty
     if (!name && !tcgId) continue;
 
     let existing =
@@ -188,32 +156,37 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
         quantity,
         game: game !== null ? game : existing.game || null,
       };
+
+      // Only set pricingPercent if provided; otherwise keep whatever existing had
+      if (pricingPercent !== null) updated.pricingPercent = pricingPercent;
+      if (pricingPercent === null && "pricingPercent" in updated) {
+        // leave as-is (do nothing)
+      }
+
       nextInventory.push(updated);
 
-      // Track "new item" if it was missing before (old had 0 qty and now > 0)
       const wasQty = Number(existing.quantity || 0);
-      if (wasQty <= 0 && quantity > 0) {
-        newItems.push(updated);
-      }
+      if (wasQty <= 0 && quantity > 0) newItems.push(updated);
     } else {
       const created = {
         name: name || "Unnamed product",
         tcgPlayerId: tcgId || null,
         quantity,
         game: game || null,
+        pricingPercent: pricingPercent !== null ? pricingPercent : null,
+
         marketPrice: null,
         yourPrice: null,
         lastUpdated: null,
         tcgPlayerUrl: tcgId ? `https://www.tcgplayer.com/product/${tcgId}` : null,
         imageUrl: tcgId ? `https://product-images.tcgplayer.com/fit-in/437x437/${tcgId}.jpg` : null,
       };
-      nextInventory.push(created);
 
+      nextInventory.push(created);
       if (quantity > 0) newItems.push(created);
     }
   }
 
-  // IMPORTANT: enforce schema + normalize and drop empty rows
   const normalizedNext = normalizeItems(nextInventory);
 
   try {
@@ -223,7 +196,6 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
     return res.status(500).json({ error: "Failed to save inventory" });
   }
 
-  // Discord alert for new stock
   if (newItems.length > 0 && DISCORD_STOCK_WEBHOOK) {
     const header = `📦 New stock added! Items: ${newItems.length}\n\n`;
     const lines = newItems.map((item) => {
@@ -235,9 +207,7 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
     });
 
     let body = lines.join("\n");
-    if (body.length > 1800) {
-      body = body.slice(0, 1800) + "\n… (truncated)";
-    }
+    if (body.length > 1800) body = body.slice(0, 1800) + "\n… (truncated)";
     sendDiscordMessage(DISCORD_STOCK_WEBHOOK, header + body);
   }
 
@@ -249,11 +219,10 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
       tcgPlayerId: i.tcgPlayerId,
       quantity: i.quantity,
       game: i.game || null,
+      pricingPercent: i.pricingPercent ?? null,
     })),
   });
 });
-
-// ---------- Start server ----------
 
 app.listen(PORT, function () {
   console.log("Server running at http://localhost:" + PORT);

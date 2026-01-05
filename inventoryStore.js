@@ -4,12 +4,14 @@
 //  2) Atomic writes (temp + rename)
 //  3) Automatic backups (keeps latest MAX_BACKUPS snapshots)
 //
-// This module is used by server.js and local scripts (updatePrices.js, pullInventory.js, etc.)
+// Phase 1.1 update:
+//  - Adds per-item pricing override: pricingPercent (e.g., 90 for 90%)
+//  - If pricingPercent is null/missing, default pricing logic applies elsewhere.
 
 const fs = require("fs");
 const path = require("path");
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 // If you want more/less backups, change this:
 const MAX_BACKUPS = 30;
@@ -27,6 +29,7 @@ const ALLOWED_ITEM_KEYS = new Set([
   "tcgPlayerUrl",
   "imageUrl",
   "game",
+  "pricingPercent", // ✅ NEW (optional override; number like 90)
 ]);
 
 function isNonEmptyString(v) {
@@ -70,12 +73,22 @@ function normalizeGame(v) {
   return g;
 }
 
+// pricingPercent: allow 1–200 (you can change bounds if you want).
+// null/empty => null (meaning "use default")
+function toPricingPercentOrNull(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+
+  const clamped = Math.max(1, Math.min(200, n));
+  // keep at most 2 decimals
+  return Math.round(clamped * 100) / 100;
+}
+
 function normalizeItem(raw) {
   const src = raw && typeof raw === "object" ? raw : {};
   const out = {};
 
-  // Lock schema: only keep keys in ALLOWED_ITEM_KEYS
-  // (If you want to allow extra keys later, add them to ALLOWED_ITEM_KEYS.)
   const name = toSafeString(src.name);
   const setName = toSafeString(src.setName);
   const tcgPlayerId = toSafeString(src.tcgPlayerId);
@@ -102,6 +115,9 @@ function normalizeItem(raw) {
 
   const game = normalizeGame(src.game);
   if (game) out.game = game;
+
+  const pricingPercent = toPricingPercentOrNull(src.pricingPercent);
+  if (pricingPercent !== null) out.pricingPercent = pricingPercent;
 
   // Ensure we didn't accidentally include other keys
   for (const k of Object.keys(out)) {
@@ -142,7 +158,6 @@ function readInventoryFile(filePath) {
 
     return { meta: { schemaVersion: 0, updatedAt: null }, items: [] };
   } catch (err) {
-    // File missing is not fatal; return empty
     if (err && err.code === "ENOENT") {
       return { meta: { schemaVersion: 0, updatedAt: null }, items: [] };
     }
@@ -221,7 +236,6 @@ function atomicWriteFileSync(filePath, dataUtf8) {
   const base = path.basename(filePath);
   const tmp = path.join(dir, `${base}.tmp-${process.pid}-${Date.now()}`);
 
-  // Write temp then rename over target (atomic on same filesystem)
   fs.writeFileSync(tmp, dataUtf8, "utf8");
   fs.renameSync(tmp, filePath);
 }
@@ -235,15 +249,11 @@ function writeInventoryFile(filePath, items) {
     items: normalizedItems,
   };
 
-  // Backup current file before overwriting
   makeBackupIfExists(filePath);
-
-  // Atomic write
   atomicWriteFileSync(filePath, JSON.stringify(payload, null, 2));
   return payload;
 }
 
-// Convenience wrappers (most callers just want the items array)
 function loadInventoryItems(filePath) {
   return readInventoryFile(filePath).items;
 }

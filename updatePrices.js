@@ -2,10 +2,12 @@
 // - Uses POST /v1/cards with an ARRAY of lookup objects (required by JustTCG)
 // - Only updates items you actually own (quantity > 0)
 // - Skips items updated in the last 24 hours (unless --force)
-// - Sends a summary Discord message when prices update
+// - Pricing:
+//    * Default = 90%
+//    * Per-item override: item.pricingPercent (e.g., 85 means 85%)
 //
-// Auth: uses X-Api-Key / x-api-key header.
-// Body: must be an array: [{ tcgplayerId: "..." }, ...]  (NOT { tcgplayerIds: [...] })
+// Auth: uses X-Api-Key header.
+// Body: array: [{ tcgplayerId: "..." }, ...]
 
 require("dotenv").config();
 const path = require("path");
@@ -29,15 +31,11 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-// Keep your previous behavior: conservative batching + rate limit
-const BATCH_SIZE = 20; // adjust if your plan allows more
+const DEFAULT_PRICING_PERCENT = 90;
+
+const BATCH_SIZE = 20;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-// Conservative rate limit: 10 batch calls/minute
 const MAX_BATCH_CALLS_PER_MIN = 10;
-
-// Your pricing rule
-const PRICE_MULTIPLIER = 0.9;
 
 let batchCallTimestamps = [];
 
@@ -58,12 +56,11 @@ async function rateLimitedBatchFetch(bodyArray) {
   const now = Date.now();
 
   batchCallTimestamps = batchCallTimestamps.filter((t) => now - t < 60_000);
-
   if (batchCallTimestamps.length >= MAX_BATCH_CALLS_PER_MIN) {
     const oldest = Math.min(...batchCallTimestamps);
     const waitMs = 60_000 - (now - oldest);
     console.log(
-      `Rate limit hit (${batchCallTimestamps.length}/${MAX_BATCH_CALLS_PER_MIN} calls in last minute). Waiting ${Math.ceil(
+      `Rate limit hit (${batchCallTimestamps.length}/${MAX_BATCH_CALLS_PER_MIN} calls/min). Waiting ${Math.ceil(
         waitMs / 1000
       )}s...`
     );
@@ -75,11 +72,9 @@ async function rateLimitedBatchFetch(bodyArray) {
   const res = await fetch(API_URL, {
     method: "POST",
     headers: {
-      // JustTCG accepts this header; case-insensitive in HTTP, but we’ll match your old working form:
       "X-Api-Key": API_KEY,
       "Content-Type": "application/json",
     },
-    // IMPORTANT: Body must be an array of lookup objects
     body: JSON.stringify(bodyArray),
   });
 
@@ -88,7 +83,7 @@ async function rateLimitedBatchFetch(bodyArray) {
     throw new Error(`JustTCG batch error ${res.status}: ${txt}`);
   }
 
-  return res.json(); // may be { data: [...] } or [...]
+  return res.json();
 }
 
 function chunkArray(arr, size) {
@@ -97,37 +92,29 @@ function chunkArray(arr, size) {
   return out;
 }
 
+function getPricingPercentForItem(item) {
+  const v = item && item.pricingPercent;
+  if (v === null || v === undefined || v === "") return DEFAULT_PRICING_PERCENT;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return DEFAULT_PRICING_PERCENT;
+  // clamp 1–200
+  return Math.max(1, Math.min(200, Math.round(n * 100) / 100));
+}
+
 async function main() {
   const force = process.argv.includes("--force");
   const inventory = loadInventoryItems(INVENTORY_PATH);
   const now = Date.now();
 
-  let skippedNoId = 0;
-  let skippedQty = 0;
-  let skippedRecent = 0;
-
   const candidates = inventory.filter((item) => {
-    if (!item) return false;
-
-    if (!item.tcgPlayerId) {
-      skippedNoId++;
-      return false;
-    }
-
+    if (!item || !item.tcgPlayerId) return false;
     const qty = Number(item.quantity);
-    if (!Number.isFinite(qty) || qty <= 0) {
-      skippedQty++;
-      return false;
-    }
+    if (!Number.isFinite(qty) || qty <= 0) return false;
 
     if (!force && item.lastUpdated) {
       const t = Date.parse(item.lastUpdated);
-      if (!Number.isNaN(t) && now - t < ONE_DAY_MS) {
-        skippedRecent++;
-        return false;
-      }
+      if (!Number.isNaN(t) && now - t < ONE_DAY_MS) return false;
     }
-
     return true;
   });
 
@@ -136,18 +123,12 @@ async function main() {
       force ? "" : " & >24h old"
     })`
   );
-  console.log(
-    `Skipped: no id=${skippedNoId}, qty<=0=${skippedQty}${
-      force ? "" : `, recent(<24h)=${skippedRecent}`
-    }`
-  );
 
   if (candidates.length === 0) {
     console.log("Nothing to update.");
     return;
   }
 
-  // Map tcgplayerId -> list of items
   const idToItems = new Map();
   for (const item of candidates) {
     const id = String(item.tcgPlayerId).trim();
@@ -157,10 +138,9 @@ async function main() {
     idToItems.set(id, list);
   }
 
-  // Build the required request format: array of lookup objects
   const lookupList = Array.from(idToItems.keys()).map((id) => ({ tcgplayerId: id }));
-
   const batches = chunkArray(lookupList, BATCH_SIZE);
+
   console.log(`Sending ${batches.length} batch requests...`);
 
   let updated = 0;
@@ -179,13 +159,11 @@ async function main() {
       continue;
     }
 
-    // Handle both array and { data: [...] }
     let cards;
     if (Array.isArray(result)) cards = result;
     else if (result && Array.isArray(result.data)) cards = result.data;
     else {
-      console.error("Unexpected API response format, expected array or { data: [...] }.");
-      console.error("Raw response keys:", result && Object.keys(result));
+      console.error("Unexpected API response format.");
       continue;
     }
 
@@ -196,29 +174,23 @@ async function main() {
       const itemsForId = idToItems.get(id);
       if (!itemsForId || itemsForId.length === 0) continue;
 
-      // Choose sealed variant first if available, else first variant
       const variants = Array.isArray(card.variants) ? card.variants : [];
       const variant =
         variants.find((v) => v && v.condition === "Sealed") ||
         variants.find((v) => v && v.price != null) ||
         null;
 
-      if (!variant || variant.price == null) {
-        for (const item of itemsForId) item.priceError = "No sealed price returned";
-        continue;
-      }
+      if (!variant || variant.price == null) continue;
 
       const price = Number(variant.price);
-      if (!Number.isFinite(price) || price <= 0 || price > 10000) {
-        for (const item of itemsForId) item.priceError = "Unreasonable price returned";
-        continue;
-      }
+      if (!Number.isFinite(price) || price <= 0 || price > 10000) continue;
 
       for (const item of itemsForId) {
-        delete item.priceError;
+        const pricingPercent = getPricingPercentForItem(item);
+        const multiplier = pricingPercent / 100;
 
-        item.marketPrice = price;
-        item.yourPrice = Number((price * PRICE_MULTIPLIER).toFixed(2));
+        item.marketPrice = Math.round(price * 100) / 100;
+        item.yourPrice = Math.round(price * multiplier * 100) / 100;
         item.setName = card.set_name || item.setName || null;
         item.lastUpdated = new Date().toISOString();
 
@@ -227,7 +199,7 @@ async function main() {
         }
 
         updated++;
-        const line = `• ${item.name} → $${item.yourPrice.toFixed(2)} (market $${item.marketPrice.toFixed(
+        const line = `• ${item.name} → $${item.yourPrice.toFixed(2)} (${pricingPercent}% of $${item.marketPrice.toFixed(
           2
         )}) qty:${item.quantity ?? 0}`;
         console.log("  " + line);
@@ -236,13 +208,11 @@ async function main() {
     }
   }
 
-  // Phase 1 safe save (schema + atomic + backup)
   saveInventoryItems(INVENTORY_PATH, inventory);
 
   console.log(`\nDone.`);
   console.log(`Updated items: ${updated}`);
   console.log(`Batch API calls made: ${apiCalls}`);
-  console.log(`Effective items/request: ${(updated / Math.max(apiCalls, 1)).toFixed(1)}`);
 
   if (updated > 0 && DISCORD_PRICE_WEBHOOK) {
     let header = `📈 Price update completed.\nUpdated items: ${updated}\n\n`;

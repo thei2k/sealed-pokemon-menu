@@ -1,4 +1,4 @@
-// admin.js – table UI with name / id / quantity / game
+// admin.js – table UI with name / id / quantity / game / pricingPercent
 // + Export Collectr CSV (TCGplayer import format)
 
 const bodyEl = document.getElementById("inventoryBody");
@@ -7,6 +7,8 @@ const loadBtn = document.getElementById("loadCurrentBtn");
 const addRowBtn = document.getElementById("addRowBtn");
 const saveBtn = document.getElementById("saveBtn");
 const exportBtn = document.getElementById("exportCollectrBtn");
+
+const DEFAULT_PRICING_PERCENT = 90;
 
 function setStatus(message, type) {
   if (!statusEl) return;
@@ -17,18 +19,12 @@ function setStatus(message, type) {
 function csvEscape(value) {
   if (value === null || value === undefined) return "";
   const s = String(value);
-  // Escape quotes by doubling them; wrap if it contains comma/newline/quote
-  if (/[",\n\r]/.test(s)) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
 
-// Create a table row for one item
 function createRow(item = {}) {
   const tr = document.createElement("tr");
-
-  // Store extra fields we don't currently edit, but may export (e.g., setName)
   tr.dataset.setName = item.setName || "";
 
   // Name
@@ -53,28 +49,21 @@ function createRow(item = {}) {
   qtyInput.type = "number";
   qtyInput.min = "0";
   qtyInput.step = "1";
-  if (
-    typeof item.quantity === "number" &&
-    !Number.isNaN(item.quantity) &&
-    item.quantity > 0
-  ) {
-    qtyInput.value = item.quantity;
-  } else {
-    qtyInput.value = "";
-  }
+  qtyInput.value =
+    typeof item.quantity === "number" && Number.isFinite(item.quantity) && item.quantity > 0
+      ? item.quantity
+      : "";
   qtyTd.appendChild(qtyInput);
 
-  // Game select
+  // Game
   const gameTd = document.createElement("td");
   const gameSelect = document.createElement("select");
-
   const options = [
     { value: "", label: "Auto-detect" },
     { value: "pokemon", label: "Pokémon" },
     { value: "mtg", label: "Magic: The Gathering" },
     { value: "other", label: "Other" },
   ];
-
   options.forEach((opt) => {
     const o = document.createElement("option");
     o.value = opt.value;
@@ -83,32 +72,40 @@ function createRow(item = {}) {
   });
 
   const currentGame = (item.game || "").toLowerCase();
-  if (currentGame === "pokemon") {
-    gameSelect.value = "pokemon";
-  } else if (currentGame === "mtg" || currentGame === "magic") {
-    gameSelect.value = "mtg";
-  } else if (currentGame === "other") {
-    gameSelect.value = "other";
-  } else {
-    gameSelect.value = "";
-  }
+  if (currentGame === "pokemon") gameSelect.value = "pokemon";
+  else if (currentGame === "mtg" || currentGame === "magic") gameSelect.value = "mtg";
+  else if (currentGame === "other") gameSelect.value = "other";
+  else gameSelect.value = "";
 
   gameTd.appendChild(gameSelect);
+
+  // Pricing %
+  const pricingTd = document.createElement("td");
+  const pricingInput = document.createElement("input");
+  pricingInput.type = "number";
+  pricingInput.min = "1";
+  pricingInput.max = "200";
+  pricingInput.step = "0.1";
+  pricingInput.placeholder = `${DEFAULT_PRICING_PERCENT} (default)`;
+  pricingInput.value =
+    item.pricingPercent !== null && item.pricingPercent !== undefined && item.pricingPercent !== ""
+      ? item.pricingPercent
+      : "";
+  pricingTd.appendChild(pricingInput);
 
   // Actions
   const actionsTd = document.createElement("td");
   const removeBtn = document.createElement("button");
   removeBtn.type = "button";
   removeBtn.textContent = "Remove";
-  removeBtn.addEventListener("click", () => {
-    tr.remove();
-  });
+  removeBtn.addEventListener("click", () => tr.remove());
   actionsTd.appendChild(removeBtn);
 
   tr.appendChild(nameTd);
   tr.appendChild(idTd);
   tr.appendChild(qtyTd);
   tr.appendChild(gameTd);
+  tr.appendChild(pricingTd);
   tr.appendChild(actionsTd);
 
   return tr;
@@ -116,14 +113,12 @@ function createRow(item = {}) {
 
 async function loadCurrentInventory() {
   if (!bodyEl) return;
-
   setStatus("Loading current inventory...", "");
   bodyEl.innerHTML = "";
 
   try {
     const res = await fetch("/api/raw-inventory");
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
     const data = await res.json();
     const items = Array.isArray(data) ? data : data.items || [];
 
@@ -133,10 +128,7 @@ async function loadCurrentInventory() {
       return;
     }
 
-    items.forEach((item) => {
-      bodyEl.appendChild(createRow(item));
-    });
-
+    items.forEach((item) => bodyEl.appendChild(createRow(item)));
     setStatus(`Loaded ${items.length} items.`, "success");
   } catch (err) {
     console.error(err);
@@ -158,27 +150,32 @@ async function saveInventory() {
   rows.forEach((row) => {
     const inputs = row.querySelectorAll("input");
     const select = row.querySelector("select");
-    if (inputs.length < 3) return;
+    if (inputs.length < 4) return;
 
     const name = inputs[0].value.trim();
     const tcgPlayerId = inputs[1].value.trim();
     const qtyRaw = inputs[2].value.trim();
+    const pricingRaw = inputs[3].value.trim();
     const game = select ? select.value.trim() : "";
 
-    // Skip completely empty rows
-    if (!name && !tcgPlayerId && !qtyRaw && !game) return;
-
-    // TCGplayer ID is required to be useful
+    if (!name && !tcgPlayerId && !qtyRaw && !game && !pricingRaw) return;
     if (!tcgPlayerId) return;
 
     let quantity = Number.parseInt(qtyRaw || "0", 10);
     if (!Number.isFinite(quantity) || quantity < 0) quantity = 0;
+
+    let pricingPercent = null;
+    if (pricingRaw !== "") {
+      const n = Number(pricingRaw);
+      if (Number.isFinite(n)) pricingPercent = n;
+    }
 
     payload.push({
       name: name || "Unnamed product",
       tcgPlayerId,
       quantity,
       game: game || null,
+      pricingPercent, // null means "use default"
     });
   });
 
@@ -206,40 +203,30 @@ async function saveInventory() {
     if (!res.ok) throw new Error(json.error || `Save failed (HTTP ${res.status})`);
 
     const total = json.totalItems ?? payload.length;
-    const newCount = (json.newItems && json.newItems.length) || 0;
-
-    setStatus(
-      `Save complete. Total items: ${total}${newCount ? ` (new: ${newCount})` : ""}`,
-      "success"
-    );
+    setStatus(`Save complete. Total items: ${total}`, "success");
   } catch (err) {
     console.error(err);
     setStatus(`Save failed: ${err.message || err}`, "error");
   }
 }
 
-function getRowsAsInventoryObjectsForExport() {
+function getRowsForExport() {
   const rows = bodyEl.querySelectorAll("tr");
   const out = [];
 
   rows.forEach((row) => {
     const inputs = row.querySelectorAll("input");
-    if (inputs.length < 3) return;
+    if (inputs.length < 4) return;
 
     const name = inputs[0].value.trim();
     const tcgPlayerId = inputs[1].value.trim();
     const qtyRaw = inputs[2].value.trim();
 
-    // Skip empty rows
     if (!name && !tcgPlayerId && !qtyRaw) return;
-
-    // Collectr import expects a Product ID (TCGplayer)
     if (!tcgPlayerId) return;
 
     let quantity = Number.parseInt(qtyRaw || "0", 10);
     if (!Number.isFinite(quantity) || quantity < 0) quantity = 0;
-
-    // Only export items you actually have
     if (quantity <= 0) return;
 
     out.push({
@@ -268,16 +255,12 @@ function downloadTextFile(filename, text, mime = "text/plain") {
 async function exportCollectrCsv() {
   if (!bodyEl) return;
 
-  // Export from what you SEE (so unsaved edits are included)
-  const items = getRowsAsInventoryObjectsForExport();
-
+  const items = getRowsForExport();
   if (items.length === 0) {
     setStatus("Nothing to export (need qty > 0 and TCGplayer ID).", "error");
     return;
   }
 
-  // Collectr’s docs show a TCGplayer CSV-style layout with these columns.
-  // We'll generate those headers and fill what we can for sealed product inventory.
   const headers = [
     "Quantity",
     "Name",
@@ -309,48 +292,20 @@ async function exportCollectrCsv() {
       Rarity: "",
       "Product ID": it.tcgPlayerId,
     };
-
-    const line = headers.map((h) => csvEscape(row[h])).join(",");
-    lines.push(line);
+    lines.push(headers.map((h) => csvEscape(row[h])).join(","));
   }
 
   const csv = lines.join("\n");
   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   downloadTextFile(`collectr-import-${stamp}.csv`, csv, "text/csv");
-
   setStatus(`Exported Collectr CSV (${items.length} rows).`, "success");
 }
 
-// Wire up buttons
-if (loadBtn) {
-  loadBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    loadCurrentInventory();
-  });
-}
+if (loadBtn) loadBtn.addEventListener("click", (e) => (e.preventDefault(), loadCurrentInventory()));
+if (addRowBtn) addRowBtn.addEventListener("click", (e) => (e.preventDefault(), addEmptyRow()));
+if (saveBtn) saveBtn.addEventListener("click", (e) => (e.preventDefault(), saveInventory()));
+if (exportBtn) exportBtn.addEventListener("click", (e) => (e.preventDefault(), exportCollectrCsv()));
 
-if (addRowBtn) {
-  addRowBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    addEmptyRow();
-  });
-}
-
-if (saveBtn) {
-  saveBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    saveInventory();
-  });
-}
-
-if (exportBtn) {
-  exportBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    exportCollectrCsv();
-  });
-}
-
-// Auto-load on page open
 document.addEventListener("DOMContentLoaded", () => {
   if (bodyEl) loadCurrentInventory();
 });
