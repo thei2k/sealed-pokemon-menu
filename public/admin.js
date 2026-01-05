@@ -1,10 +1,12 @@
 // admin.js – table UI with name / id / quantity / game
+// + Export Collectr CSV (TCGplayer import format)
 
 const bodyEl = document.getElementById("inventoryBody");
 const statusEl = document.getElementById("adminStatus");
 const loadBtn = document.getElementById("loadCurrentBtn");
 const addRowBtn = document.getElementById("addRowBtn");
 const saveBtn = document.getElementById("saveBtn");
+const exportBtn = document.getElementById("exportCollectrBtn");
 
 function setStatus(message, type) {
   if (!statusEl) return;
@@ -12,9 +14,22 @@ function setStatus(message, type) {
   statusEl.className = "status-message" + (type ? " " + type : "");
 }
 
+function csvEscape(value) {
+  if (value === null || value === undefined) return "";
+  const s = String(value);
+  // Escape quotes by doubling them; wrap if it contains comma/newline/quote
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
 // Create a table row for one item
 function createRow(item = {}) {
   const tr = document.createElement("tr");
+
+  // Store extra fields we don't currently edit, but may export (e.g., setName)
+  tr.dataset.setName = item.setName || "";
 
   // Name
   const nameTd = document.createElement("td");
@@ -107,9 +122,7 @@ async function loadCurrentInventory() {
 
   try {
     const res = await fetch("/api/raw-inventory");
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const data = await res.json();
     const items = Array.isArray(data) ? data : data.items || [];
@@ -153,19 +166,13 @@ async function saveInventory() {
     const game = select ? select.value.trim() : "";
 
     // Skip completely empty rows
-    if (!name && !tcgPlayerId && !qtyRaw && !game) {
-      return;
-    }
+    if (!name && !tcgPlayerId && !qtyRaw && !game) return;
 
     // TCGplayer ID is required to be useful
-    if (!tcgPlayerId) {
-      return;
-    }
+    if (!tcgPlayerId) return;
 
     let quantity = Number.parseInt(qtyRaw || "0", 10);
-    if (!Number.isFinite(quantity) || quantity < 0) {
-      quantity = 0;
-    }
+    if (!Number.isFinite(quantity) || quantity < 0) quantity = 0;
 
     payload.push({
       name: name || "Unnamed product",
@@ -196,23 +203,122 @@ async function saveInventory() {
       json = {};
     }
 
-    if (!res.ok) {
-      throw new Error(json.error || `Save failed (HTTP ${res.status})`);
-    }
+    if (!res.ok) throw new Error(json.error || `Save failed (HTTP ${res.status})`);
 
     const total = json.totalItems ?? payload.length;
     const newCount = (json.newItems && json.newItems.length) || 0;
 
     setStatus(
-      `Save complete. Total items: ${total}${
-        newCount ? ` (new: ${newCount})` : ""
-      }`,
+      `Save complete. Total items: ${total}${newCount ? ` (new: ${newCount})` : ""}`,
       "success"
     );
   } catch (err) {
     console.error(err);
     setStatus(`Save failed: ${err.message || err}`, "error");
   }
+}
+
+function getRowsAsInventoryObjectsForExport() {
+  const rows = bodyEl.querySelectorAll("tr");
+  const out = [];
+
+  rows.forEach((row) => {
+    const inputs = row.querySelectorAll("input");
+    if (inputs.length < 3) return;
+
+    const name = inputs[0].value.trim();
+    const tcgPlayerId = inputs[1].value.trim();
+    const qtyRaw = inputs[2].value.trim();
+
+    // Skip empty rows
+    if (!name && !tcgPlayerId && !qtyRaw) return;
+
+    // Collectr import expects a Product ID (TCGplayer)
+    if (!tcgPlayerId) return;
+
+    let quantity = Number.parseInt(qtyRaw || "0", 10);
+    if (!Number.isFinite(quantity) || quantity < 0) quantity = 0;
+
+    // Only export items you actually have
+    if (quantity <= 0) return;
+
+    out.push({
+      name: name || "Unnamed product",
+      tcgPlayerId,
+      quantity,
+      setName: row.dataset.setName || "",
+    });
+  });
+
+  return out;
+}
+
+function downloadTextFile(filename, text, mime = "text/plain") {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function exportCollectrCsv() {
+  if (!bodyEl) return;
+
+  // Export from what you SEE (so unsaved edits are included)
+  const items = getRowsAsInventoryObjectsForExport();
+
+  if (items.length === 0) {
+    setStatus("Nothing to export (need qty > 0 and TCGplayer ID).", "error");
+    return;
+  }
+
+  // Collectr’s docs show a TCGplayer CSV-style layout with these columns.
+  // We'll generate those headers and fill what we can for sealed product inventory.
+  const headers = [
+    "Quantity",
+    "Name",
+    "Simple Name",
+    "Set",
+    "Card Number",
+    "Set Code",
+    "Printing",
+    "Condition",
+    "Language",
+    "Rarity",
+    "Product ID",
+  ];
+
+  const lines = [];
+  lines.push(headers.map(csvEscape).join(","));
+
+  for (const it of items) {
+    const row = {
+      Quantity: it.quantity,
+      Name: it.name,
+      "Simple Name": it.name,
+      Set: it.setName || "",
+      "Card Number": "",
+      "Set Code": "",
+      Printing: "Normal",
+      Condition: "Sealed",
+      Language: "English",
+      Rarity: "",
+      "Product ID": it.tcgPlayerId,
+    };
+
+    const line = headers.map((h) => csvEscape(row[h])).join(",");
+    lines.push(line);
+  }
+
+  const csv = lines.join("\n");
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  downloadTextFile(`collectr-import-${stamp}.csv`, csv, "text/csv");
+
+  setStatus(`Exported Collectr CSV (${items.length} rows).`, "success");
 }
 
 // Wire up buttons
@@ -237,9 +343,14 @@ if (saveBtn) {
   });
 }
 
+if (exportBtn) {
+  exportBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    exportCollectrCsv();
+  });
+}
+
 // Auto-load on page open
 document.addEventListener("DOMContentLoaded", () => {
-  if (bodyEl) {
-    loadCurrentInventory();
-  }
+  if (bodyEl) loadCurrentInventory();
 });

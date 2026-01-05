@@ -1,10 +1,11 @@
 // updatePrices.js - BATCH VERSION with Discord alerts
-// - Uses POST /v1/cards with up to 100 tcgplayerIds per request
+// - Uses POST /v1/cards with an ARRAY of lookup objects (required by JustTCG)
 // - Only updates items you actually own (quantity > 0)
 // - Skips items updated in the last 24 hours (unless --force)
 // - Sends a summary Discord message when prices update
 //
-// IMPORTANT: JustTCG auth uses `x-api-key` header (NOT Authorization: Bearer).
+// Auth: uses X-Api-Key / x-api-key header.
+// Body: must be an array: [{ tcgplayerId: "..." }, ...]  (NOT { tcgplayerIds: [...] })
 
 require("dotenv").config();
 const path = require("path");
@@ -28,13 +29,20 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-const MAX_BATCH_CALLS_PER_MIN = 25;
+// Keep your previous behavior: conservative batching + rate limit
+const BATCH_SIZE = 20; // adjust if your plan allows more
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+// Conservative rate limit: 10 batch calls/minute
+const MAX_BATCH_CALLS_PER_MIN = 10;
+
+// Your pricing rule
+const PRICE_MULTIPLIER = 0.9;
+
 let batchCallTimestamps = [];
 
 function sendDiscordMessage(webhookUrl, content) {
   if (!webhookUrl || !content) return;
-  if (typeof fetch !== "function") return;
-
   fetch(webhookUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -46,11 +54,9 @@ function sendDiscordMessage(webhookUrl, content) {
     .catch((err) => console.error("Discord webhook error:", err.message || err));
 }
 
-// Rate limit wrapper for POST batch requests
-async function rateLimitedBatchFetch(body) {
+async function rateLimitedBatchFetch(bodyArray) {
   const now = Date.now();
 
-  // Keep only last 60 seconds of timestamps
   batchCallTimestamps = batchCallTimestamps.filter((t) => now - t < 60_000);
 
   if (batchCallTimestamps.length >= MAX_BATCH_CALLS_PER_MIN) {
@@ -69,97 +75,151 @@ async function rateLimitedBatchFetch(body) {
   const res = await fetch(API_URL, {
     method: "POST",
     headers: {
+      // JustTCG accepts this header; case-insensitive in HTTP, but we’ll match your old working form:
+      "X-Api-Key": API_KEY,
       "Content-Type": "application/json",
-      "x-api-key": API_KEY, // ✅ correct JustTCG auth header
     },
-    body: JSON.stringify(body),
+    // IMPORTANT: Body must be an array of lookup objects
+    body: JSON.stringify(bodyArray),
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `JustTCG batch request failed: ${res.status} ${res.statusText} ${text}`
-    );
+    const txt = await res.text().catch(() => "");
+    throw new Error(`JustTCG batch error ${res.status}: ${txt}`);
   }
 
-  return res.json();
+  return res.json(); // may be { data: [...] } or [...]
 }
 
-function shouldSkipByCooldown(item, cooldownMs) {
-  if (!item || !item.lastUpdated) return false;
-  const t = Date.parse(item.lastUpdated);
-  if (!Number.isFinite(t)) return false;
-  return Date.now() - t < cooldownMs;
+function chunkArray(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
 }
 
 async function main() {
   const force = process.argv.includes("--force");
-
   const inventory = loadInventoryItems(INVENTORY_PATH);
+  const now = Date.now();
 
-  // Only update items you own and have tcgPlayerId
-  const owned = inventory.filter((i) => (i.quantity ?? 0) > 0 && i.tcgPlayerId);
+  let skippedNoId = 0;
+  let skippedQty = 0;
+  let skippedRecent = 0;
 
-  const cooldownMs = 24 * 60 * 60 * 1000;
-  const toUpdate = force ? owned : owned.filter((i) => !shouldSkipByCooldown(i, cooldownMs));
+  const candidates = inventory.filter((item) => {
+    if (!item) return false;
+
+    if (!item.tcgPlayerId) {
+      skippedNoId++;
+      return false;
+    }
+
+    const qty = Number(item.quantity);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      skippedQty++;
+      return false;
+    }
+
+    if (!force && item.lastUpdated) {
+      const t = Date.parse(item.lastUpdated);
+      if (!Number.isNaN(t) && now - t < ONE_DAY_MS) {
+        skippedRecent++;
+        return false;
+      }
+    }
+
+    return true;
+  });
 
   console.log(
-    `Inventory loaded: ${inventory.length} items. Owned w/ID: ${owned.length}. Updating: ${toUpdate.length}. (force=${force})`
+    `Total inventory: ${inventory.length}\n→ Candidates: ${candidates.length} (qty>0${
+      force ? "" : " & >24h old"
+    })`
+  );
+  console.log(
+    `Skipped: no id=${skippedNoId}, qty<=0=${skippedQty}${
+      force ? "" : `, recent(<24h)=${skippedRecent}`
+    }`
   );
 
-  // Batch into chunks of 100 tcgplayerIds
-  const ids = toUpdate.map((i) => String(i.tcgPlayerId));
-  const chunks = [];
-  for (let i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
+  if (candidates.length === 0) {
+    console.log("Nothing to update.");
+    return;
+  }
+
+  // Map tcgplayerId -> list of items
+  const idToItems = new Map();
+  for (const item of candidates) {
+    const id = String(item.tcgPlayerId).trim();
+    if (!id) continue;
+    const list = idToItems.get(id) || [];
+    list.push(item);
+    idToItems.set(id, list);
+  }
+
+  // Build the required request format: array of lookup objects
+  const lookupList = Array.from(idToItems.keys()).map((id) => ({ tcgplayerId: id }));
+
+  const batches = chunkArray(lookupList, BATCH_SIZE);
+  console.log(`Sending ${batches.length} batch requests...`);
 
   let updated = 0;
+  let apiCalls = 0;
   const priceUpdateLines = [];
 
-  for (let c = 0; c < chunks.length; c++) {
-    const chunk = chunks[c];
-    console.log(`\nBatch ${c + 1}/${chunks.length} (${chunk.length} ids)`);
+  for (let b = 0; b < batches.length; b++) {
+    console.log(`\n[Batch ${b + 1}/${batches.length}] fetching ${batches[b].length} items...`);
 
     let result;
     try {
-      result = await rateLimitedBatchFetch({ tcgplayerIds: chunk });
+      result = await rateLimitedBatchFetch(batches[b]);
+      apiCalls++;
     } catch (err) {
-      console.error("Batch failed:", err.message || err);
+      console.error("Batch fetch failed:", err.message || err);
       continue;
     }
 
-    let cards = [];
+    // Handle both array and { data: [...] }
+    let cards;
     if (Array.isArray(result)) cards = result;
     else if (result && Array.isArray(result.data)) cards = result.data;
     else {
-      console.error("Unexpected API response format. Expected array or { data: [...] }.");
+      console.error("Unexpected API response format, expected array or { data: [...] }.");
       console.error("Raw response keys:", result && Object.keys(result));
       continue;
     }
 
-    // Map by tcgplayerId for fast lookup
-    const byId = new Map();
     for (const card of cards) {
       if (!card || !card.tcgplayerId) continue;
-      byId.set(String(card.tcgplayerId), card);
-    }
 
-    for (const item of toUpdate) {
-      if (!item || !item.tcgPlayerId) continue;
-      const card = byId.get(String(item.tcgPlayerId));
-      if (!card) continue;
+      const id = String(card.tcgplayerId);
+      const itemsForId = idToItems.get(id);
+      if (!itemsForId || itemsForId.length === 0) continue;
 
-      const market = Number(card?.marketPrice);
-      if (!Number.isFinite(market) || market <= 0) continue;
+      // Choose sealed variant first if available, else first variant
+      const variants = Array.isArray(card.variants) ? card.variants : [];
+      const variant =
+        variants.find((v) => v && v.condition === "Sealed") ||
+        variants.find((v) => v && v.price != null) ||
+        null;
 
-      // Your price = 90% of market (your existing logic)
-      const your = Math.round(market * 0.9 * 100) / 100;
+      if (!variant || variant.price == null) {
+        for (const item of itemsForId) item.priceError = "No sealed price returned";
+        continue;
+      }
 
-      const changed =
-        item.marketPrice !== market || item.yourPrice !== your || !item.lastUpdated;
+      const price = Number(variant.price);
+      if (!Number.isFinite(price) || price <= 0 || price > 10000) {
+        for (const item of itemsForId) item.priceError = "Unreasonable price returned";
+        continue;
+      }
 
-      if (changed) {
-        item.marketPrice = Math.round(market * 100) / 100;
-        item.yourPrice = your;
+      for (const item of itemsForId) {
+        delete item.priceError;
+
+        item.marketPrice = price;
+        item.yourPrice = Number((price * PRICE_MULTIPLIER).toFixed(2));
+        item.setName = card.set_name || item.setName || null;
         item.lastUpdated = new Date().toISOString();
 
         if (!item.imageUrl && item.tcgPlayerId) {
@@ -176,12 +236,14 @@ async function main() {
     }
   }
 
-  // Save inventory (schema + atomic + backup)
+  // Phase 1 safe save (schema + atomic + backup)
   saveInventoryItems(INVENTORY_PATH, inventory);
 
-  console.log(`\n✅ Updated ${updated} items.`);
+  console.log(`\nDone.`);
+  console.log(`Updated items: ${updated}`);
+  console.log(`Batch API calls made: ${apiCalls}`);
+  console.log(`Effective items/request: ${(updated / Math.max(apiCalls, 1)).toFixed(1)}`);
 
-  // Discord alert for price updates
   if (updated > 0 && DISCORD_PRICE_WEBHOOK) {
     let header = `📈 Price update completed.\nUpdated items: ${updated}\n\n`;
     let body = priceUpdateLines.join("\n");
