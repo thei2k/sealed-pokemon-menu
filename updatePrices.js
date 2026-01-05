@@ -3,6 +3,8 @@
 // - Only updates items you actually own (quantity > 0)
 // - Skips items updated in the last 24 hours (unless --force)
 // - Sends a summary Discord message when prices update
+//
+// IMPORTANT: JustTCG auth uses `x-api-key` header (NOT Authorization: Bearer).
 
 require("dotenv").config();
 const path = require("path");
@@ -39,13 +41,9 @@ function sendDiscordMessage(webhookUrl, content) {
     body: JSON.stringify({ content }),
   })
     .then((res) => {
-      if (!res.ok) {
-        console.error("Discord webhook failed with status", res.status);
-      }
+      if (!res.ok) console.error("Discord webhook failed with status", res.status);
     })
-    .catch((err) => {
-      console.error("Discord webhook error:", err.message || err);
-    });
+    .catch((err) => console.error("Discord webhook error:", err.message || err));
 }
 
 // Rate limit wrapper for POST batch requests
@@ -72,7 +70,7 @@ async function rateLimitedBatchFetch(body) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${API_KEY}`,
+      "x-api-key": API_KEY, // ✅ correct JustTCG auth header
     },
     body: JSON.stringify(body),
   });
@@ -100,14 +98,10 @@ async function main() {
   const inventory = loadInventoryItems(INVENTORY_PATH);
 
   // Only update items you own and have tcgPlayerId
-  const owned = inventory.filter(
-    (i) => (i.quantity ?? 0) > 0 && i.tcgPlayerId
-  );
+  const owned = inventory.filter((i) => (i.quantity ?? 0) > 0 && i.tcgPlayerId);
 
   const cooldownMs = 24 * 60 * 60 * 1000;
-  const toUpdate = force
-    ? owned
-    : owned.filter((i) => !shouldSkipByCooldown(i, cooldownMs));
+  const toUpdate = force ? owned : owned.filter((i) => !shouldSkipByCooldown(i, cooldownMs));
 
   console.log(
     `Inventory loaded: ${inventory.length} items. Owned w/ID: ${owned.length}. Updating: ${toUpdate.length}. (force=${force})`
@@ -116,9 +110,7 @@ async function main() {
   // Batch into chunks of 100 tcgplayerIds
   const ids = toUpdate.map((i) => String(i.tcgPlayerId));
   const chunks = [];
-  for (let i = 0; i < ids.length; i += 100) {
-    chunks.push(ids.slice(i, i + 100));
-  }
+  for (let i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
 
   let updated = 0;
   const priceUpdateLines = [];
@@ -136,15 +128,11 @@ async function main() {
     }
 
     let cards = [];
-    if (Array.isArray(result)) {
-      cards = result;
-    } else if (result && Array.isArray(result.data)) {
-      cards = result.data;
-    } else {
-      console.error(
-        "Unexpected API response format, expected array or { data: [...] }."
-      );
-      console.error("Raw response shape keys:", result && Object.keys(result));
+    if (Array.isArray(result)) cards = result;
+    else if (result && Array.isArray(result.data)) cards = result.data;
+    else {
+      console.error("Unexpected API response format. Expected array or { data: [...] }.");
+      console.error("Raw response keys:", result && Object.keys(result));
       continue;
     }
 
@@ -163,13 +151,11 @@ async function main() {
       const market = Number(card?.marketPrice);
       if (!Number.isFinite(market) || market <= 0) continue;
 
-      // Your price = 90% of market (example logic)
+      // Your price = 90% of market (your existing logic)
       const your = Math.round(market * 0.9 * 100) / 100;
 
       const changed =
-        item.marketPrice !== market ||
-        item.yourPrice !== your ||
-        !item.lastUpdated;
+        item.marketPrice !== market || item.yourPrice !== your || !item.lastUpdated;
 
       if (changed) {
         item.marketPrice = Math.round(market * 100) / 100;
@@ -181,9 +167,9 @@ async function main() {
         }
 
         updated++;
-        const line = `• ${item.name} → $${item.yourPrice.toFixed(
+        const line = `• ${item.name} → $${item.yourPrice.toFixed(2)} (market $${item.marketPrice.toFixed(
           2
-        )} (market $${item.marketPrice.toFixed(2)}) qty:${item.quantity ?? 0}`;
+        )}) qty:${item.quantity ?? 0}`;
         console.log("  " + line);
         priceUpdateLines.push(line);
       }
@@ -199,9 +185,7 @@ async function main() {
   if (updated > 0 && DISCORD_PRICE_WEBHOOK) {
     let header = `📈 Price update completed.\nUpdated items: ${updated}\n\n`;
     let body = priceUpdateLines.join("\n");
-    if (body.length > 1800) {
-      body = body.slice(0, 1800) + "\n… (truncated)";
-    }
+    if (body.length > 1800) body = body.slice(0, 1800) + "\n… (truncated)";
     sendDiscordMessage(DISCORD_PRICE_WEBHOOK, header + body);
   }
 }
