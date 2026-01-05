@@ -1,6 +1,18 @@
-const fs = require("fs");
+// pullInventory.js
+// Downloads live inventory from your deployed server and saves it locally.
+//
+// Phase 1 hardening note:
+// We save using inventoryStore.js so the local inventory.json is always:
+//  - schemaVersion'd
+//  - normalized
+//  - written atomically
+//  - backed up automatically
+
+const path = require("path");
+const { saveInventoryItems } = require("./inventoryStore");
 
 const url = "https://sealed-pokemon-menu.onrender.com/api/inventory";
+const INVENTORY_PATH = path.join(__dirname, "inventory.json");
 
 async function pull() {
   console.log("⏳ Downloading live inventory from Render...");
@@ -13,7 +25,7 @@ async function pull() {
   const json = await res.json();
 
   // Support either raw array or { items: [...] }
-  let items;
+  let items = null;
   if (Array.isArray(json)) {
     items = json;
   } else if (json && Array.isArray(json.items)) {
@@ -22,7 +34,7 @@ async function pull() {
     throw new Error("Unexpected inventory format from API");
   }
 
-  fs.writeFileSync("./inventory.json", JSON.stringify(items, null, 2), "utf8");
+  saveInventoryItems(INVENTORY_PATH, items);
 
   console.log(
     `✔ inventory.json updated locally with ${items.length} items from server`

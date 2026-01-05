@@ -5,8 +5,9 @@
 // - Sends a summary Discord message when prices update
 
 require("dotenv").config();
-const fs = require("fs");
 const path = require("path");
+
+const { loadInventoryItems, saveInventoryItems } = require("./inventoryStore");
 
 if (typeof fetch !== "function") {
   console.error("Node 18+ required (fetch built-in).");
@@ -25,13 +26,7 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-const BATCH_SIZE = 20; // your plan allows 100 IDs/request
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-// Conservative rate limit: 40 batch calls/minute (4000 IDs/min effective)
-const MAX_BATCH_CALLS_PER_MIN = 10;
-const PRICE_MULTIPLIER = 0.9;
-
+const MAX_BATCH_CALLS_PER_MIN = 25;
 let batchCallTimestamps = [];
 
 function sendDiscordMessage(webhookUrl, content) {
@@ -51,23 +46,6 @@ function sendDiscordMessage(webhookUrl, content) {
     .catch((err) => {
       console.error("Discord webhook error:", err.message || err);
     });
-}
-
-function loadInventory() {
-  try {
-    const raw = fs.readFileSync(INVENTORY_PATH, "utf8");
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed;
-    if (parsed && Array.isArray(parsed.items)) return parsed.items;
-    return [];
-  } catch (err) {
-    console.error("Error reading inventory.json:", err.message || err);
-    return [];
-  }
-}
-
-function saveInventory(inv) {
-  fs.writeFileSync(INVENTORY_PATH, JSON.stringify(inv, null, 2), "utf8");
 }
 
 // Rate limit wrapper for POST batch requests
@@ -93,116 +71,71 @@ async function rateLimitedBatchFetch(body) {
   const res = await fetch(API_URL, {
     method: "POST",
     headers: {
-      "X-Api-Key": API_KEY,
       "Content-Type": "application/json",
+      Authorization: `Bearer ${API_KEY}`,
     },
     body: JSON.stringify(body),
   });
 
   if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`JustTCG batch error ${res.status}: ${txt}`);
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `JustTCG batch request failed: ${res.status} ${res.statusText} ${text}`
+    );
   }
 
-  // Could be { data: [...] } or just [...]
   return res.json();
 }
 
-function chunkArray(arr, size) {
-  const out = [];
-  for (let i = 0; i < arr.length; i += size) {
-    out.push(arr.slice(i, i + size));
-  }
-  return out;
+function shouldSkipByCooldown(item, cooldownMs) {
+  if (!item || !item.lastUpdated) return false;
+  const t = Date.parse(item.lastUpdated);
+  if (!Number.isFinite(t)) return false;
+  return Date.now() - t < cooldownMs;
 }
 
 async function main() {
   const force = process.argv.includes("--force");
-  const inventory = loadInventory();
-  const now = Date.now();
 
-  let skippedNoId = 0;
-  let skippedQty = 0;
-  let skippedRecent = 0;
+  const inventory = loadInventoryItems(INVENTORY_PATH);
 
-  const candidates = inventory.filter((item) => {
-    if (!item) return false;
-
-    if (!item.tcgPlayerId) {
-      skippedNoId++;
-      return false;
-    }
-
-    const qty = Number(item.quantity);
-    if (!Number.isFinite(qty) || qty <= 0) {
-      skippedQty++;
-      return false;
-    }
-
-    if (!force && item.lastUpdated) {
-      const t = Date.parse(item.lastUpdated);
-      if (!Number.isNaN(t) && now - t < ONE_DAY_MS) {
-        skippedRecent++;
-        return false;
-      }
-    }
-
-    return true;
-  });
-
-  console.log(
-    `Total inventory: ${inventory.length}\n→ Candidates: ${candidates.length} (qty>0${
-      force ? "" : " & >24h old"
-    })`
-  );
-  console.log(
-    `Skipped: no id=${skippedNoId}, qty<=0=${skippedQty}${
-      force ? "" : `, recent(<24h)=${skippedRecent}`
-    }`
+  // Only update items you own and have tcgPlayerId
+  const owned = inventory.filter(
+    (i) => (i.quantity ?? 0) > 0 && i.tcgPlayerId
   );
 
-  if (candidates.length === 0) {
-    console.log("Nothing to update.");
-    return;
+  const cooldownMs = 24 * 60 * 60 * 1000;
+  const toUpdate = force
+    ? owned
+    : owned.filter((i) => !shouldSkipByCooldown(i, cooldownMs));
+
+  console.log(
+    `Inventory loaded: ${inventory.length} items. Owned w/ID: ${owned.length}. Updating: ${toUpdate.length}. (force=${force})`
+  );
+
+  // Batch into chunks of 100 tcgplayerIds
+  const ids = toUpdate.map((i) => String(i.tcgPlayerId));
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    chunks.push(ids.slice(i, i + 100));
   }
-
-  // Map tcgplayerId -> list of items
-  const idToItems = new Map();
-  for (const item of candidates) {
-    const id = String(item.tcgPlayerId).trim();
-    if (!id) continue;
-    const list = idToItems.get(id) || [];
-    list.push(item);
-    idToItems.set(id, list);
-  }
-
-  const idList = Array.from(idToItems.keys()).map((id) => ({
-    tcgplayerId: id,
-  }));
-
-  const batches = chunkArray(idList, BATCH_SIZE);
-  console.log(`Sending ${batches.length} batch requests...`);
 
   let updated = 0;
-  let apiCalls = 0;
   const priceUpdateLines = [];
 
-  for (let b = 0; b < batches.length; b++) {
-    console.log(
-      `\n[Batch ${b + 1}/${batches.length}] fetching ${batches[b].length} items...`
-    );
+  for (let c = 0; c < chunks.length; c++) {
+    const chunk = chunks[c];
+    console.log(`\nBatch ${c + 1}/${chunks.length} (${chunk.length} ids)`);
 
     let result;
     try {
-      result = await rateLimitedBatchFetch(batches[b]);
-      apiCalls++;
+      result = await rateLimitedBatchFetch({ tcgplayerIds: chunk });
     } catch (err) {
-      console.error("Batch fetch failed:", err.message || err);
+      console.error("Batch failed:", err.message || err);
       continue;
     }
 
-    // Handle both array and { data: [...] }
-    let cards;
+    let cards = [];
     if (Array.isArray(result)) {
       cards = result;
     } else if (result && Array.isArray(result.data)) {
@@ -215,38 +148,32 @@ async function main() {
       continue;
     }
 
+    // Map by tcgplayerId for fast lookup
+    const byId = new Map();
     for (const card of cards) {
       if (!card || !card.tcgplayerId) continue;
+      byId.set(String(card.tcgplayerId), card);
+    }
 
-      const id = String(card.tcgplayerId);
-      const itemsForId = idToItems.get(id);
-      if (!itemsForId || itemsForId.length === 0) continue;
+    for (const item of toUpdate) {
+      if (!item || !item.tcgPlayerId) continue;
+      const card = byId.get(String(item.tcgPlayerId));
+      if (!card) continue;
 
-      let variant =
-        (card.variants || []).find((v) => v.condition === "Sealed") ||
-        (card.variants || [])[0];
+      const market = Number(card?.marketPrice);
+      if (!Number.isFinite(market) || market <= 0) continue;
 
-      if (!variant || variant.price == null) {
-        for (const item of itemsForId) {
-          item.priceError = "No sealed price returned";
-        }
-        continue;
-      }
+      // Your price = 90% of market (example logic)
+      const your = Math.round(market * 0.9 * 100) / 100;
 
-      const price = Number(variant.price);
-      if (!Number.isFinite(price) || price <= 0 || price > 10000) {
-        for (const item of itemsForId) {
-          item.priceError = "Unreasonable price returned";
-        }
-        continue;
-      }
+      const changed =
+        item.marketPrice !== market ||
+        item.yourPrice !== your ||
+        !item.lastUpdated;
 
-      for (const item of itemsForId) {
-        delete item.priceError;
-
-        item.marketPrice = price;
-        item.yourPrice = Number((price * PRICE_MULTIPLIER).toFixed(2));
-        item.setName = card.set_name || item.setName || null;
+      if (changed) {
+        item.marketPrice = Math.round(market * 100) / 100;
+        item.yourPrice = your;
         item.lastUpdated = new Date().toISOString();
 
         if (!item.imageUrl && item.tcgPlayerId) {
@@ -263,14 +190,10 @@ async function main() {
     }
   }
 
-  saveInventory(inventory);
+  // Save inventory (schema + atomic + backup)
+  saveInventoryItems(INVENTORY_PATH, inventory);
 
-  console.log(`\nDone.`);
-  console.log(`Updated items: ${updated}`);
-  console.log(`Batch API calls made: ${apiCalls}`);
-  console.log(
-    `Effective items/request: ${(updated / Math.max(apiCalls, 1)).toFixed(1)}`
-  );
+  console.log(`\n✅ Updated ${updated} items.`);
 
   // Discord alert for price updates
   if (updated > 0 && DISCORD_PRICE_WEBHOOK) {
