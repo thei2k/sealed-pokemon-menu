@@ -1,6 +1,13 @@
 // discordBot.js
-// Discord bot that lets users track TCGplayer IDs and get daily + on-demand DM price updates,
-// with server/user-based access control.
+// Discord portfolio tracker bot (Railway).
+// - Users track tcgplayerIds
+// - Daily DM at 10 AM
+// - On-demand check via !inventorynow (2h cooldown, admins bypass)
+//
+// Portfolio item schema (canonical):
+//   { tcgplayerId: "543843", label: "Booster Box" }
+// Backwards compatible with older:
+//   { id: "543843", label: "Booster Box" }
 
 require("dotenv").config();
 const fs = require("fs");
@@ -13,50 +20,45 @@ const {
 } = require("discord.js");
 const cron = require("node-cron");
 
-// ---- ENVIRONMENT ----
-
+// ---- ENV ----
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const JUSTTCG_API_KEY = process.env.JUSTTCG_API_KEY;
 
+// Optional allowlists
 const ALLOWED_GUILD_IDS = process.env.ALLOWED_GUILD_IDS
-  ? process.env.ALLOWED_GUILD_IDS.split(",")
-      .map((id) => id.trim())
-      .filter(Boolean)
+  ? process.env.ALLOWED_GUILD_IDS.split(",").map((s) => s.trim()).filter(Boolean)
   : [];
-
 const ALLOWED_USER_IDS = process.env.ALLOWED_USER_IDS
-  ? process.env.ALLOWED_USER_IDS.split(",")
-      .map((id) => id.trim())
-      .filter(Boolean)
+  ? process.env.ALLOWED_USER_IDS.split(",").map((s) => s.trim()).filter(Boolean)
   : [];
 
+// Optional persistent storage path (Railway Volume mount recommended)
+const PORTFOLIO_PATH = process.env.PORTFOLIO_PATH
+  ? path.resolve(process.env.PORTFOLIO_PATH)
+  : path.join(__dirname, "userPortfolios.json");
+
+const DEBUG_JUSTTCG = process.env.DEBUG_JUSTTCG === "1";
+
+if (!DISCORD_BOT_TOKEN) {
+  console.error("Missing DISCORD_BOT_TOKEN");
+  process.exit(1);
+}
+if (!JUSTTCG_API_KEY) {
+  console.error("Missing JUSTTCG_API_KEY");
+  process.exit(1);
+}
 if (typeof fetch !== "function") {
   console.error("Node 18+ required (fetch built-in).");
   process.exit(1);
 }
 
-if (!DISCORD_BOT_TOKEN) {
-  console.error("Missing DISCORD_BOT_TOKEN in environment.");
-  process.exit(1);
-}
-
-if (!JUSTTCG_API_KEY) {
-  console.error("Missing JUSTTCG_API_KEY in environment.");
-  process.exit(1);
-}
-
-// ---- CONSTANTS ----
-
-const PORTFOLIO_PATH = path.join(__dirname, "userPortfolios.json");
+// ---- CONST ----
 const CMD_PREFIX = "!";
-const BATCH_SIZE = 20; // JustTCG plan limit
-
-// Cooldown: 2 hours for normal users (server admins bypass)
+const BATCH_SIZE = 20;
 const ON_DEMAND_COOLDOWN_MS = 2 * 60 * 60 * 1000;
-const lastOnDemandRun = {}; // { userId: timestamp }
+const lastOnDemandRun = {}; // userId -> ts
 
-// ---- DISCORD CLIENT ----
-
+// ---- DISCORD ----
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -67,46 +69,57 @@ const client = new Client({
   partials: [Partials.Channel],
 });
 
-// ---- ACCESS CONTROL HELPERS ----
-//
-// By default (no ALLOWED_GUILD_IDS / ALLOWED_USER_IDS set), the bot
-// behaves as before and is usable anywhere. Once you configure either
-// env var, only those guilds/users will be allowed.
-
+// ---- ACCESS ----
 function isUserAllowed(message) {
   const userId = message.author.id;
 
-  // If no allow lists are configured, allow everyone (backwards compatible).
-  if (ALLOWED_GUILD_IDS.length === 0 && ALLOWED_USER_IDS.length === 0) {
-    return true;
-  }
+  // No allowlists configured => allow all (backwards compatible)
+  if (ALLOWED_GUILD_IDS.length === 0 && ALLOWED_USER_IDS.length === 0) return true;
 
-  // Explicit per-user allow list (works for DMs and guilds).
-  if (ALLOWED_USER_IDS.includes(userId)) {
-    return true;
-  }
+  if (ALLOWED_USER_IDS.includes(userId)) return true;
 
-  // Guild messages: only allow if guild is whitelisted.
   if (message.guild) {
-    const guildId = message.guild.id;
-    return ALLOWED_GUILD_IDS.includes(guildId);
+    return ALLOWED_GUILD_IDS.includes(message.guild.id);
   }
 
-  // DM from non-allowed user: blocked.
   return false;
 }
 
-// ---- STORAGE HELPERS ----
+// ---- STORAGE ----
+function ensureDirForFile(fp) {
+  const dir = path.dirname(fp);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+function getItemId(item) {
+  return String(item?.tcgplayerId ?? item?.id ?? "").trim();
+}
+
+function normalizePortfolios(portfolios) {
+  const out = {};
+  for (const [userId, items] of Object.entries(portfolios || {})) {
+    const map = new Map();
+    for (const raw of items || []) {
+      const tcgplayerId = getItemId(raw);
+      if (!tcgplayerId) continue;
+      const label = raw?.label != null ? String(raw.label).trim() : "";
+      map.set(tcgplayerId, { tcgplayerId, label });
+    }
+    out[userId] = Array.from(map.values());
+  }
+  return out;
+}
 
 function loadPortfolios() {
   try {
+    ensureDirForFile(PORTFOLIO_PATH);
     if (!fs.existsSync(PORTFOLIO_PATH)) {
       fs.writeFileSync(PORTFOLIO_PATH, JSON.stringify({}, null, 2), "utf8");
       return {};
     }
     const raw = fs.readFileSync(PORTFOLIO_PATH, "utf8");
     if (!raw.trim()) return {};
-    return JSON.parse(raw);
+    return normalizePortfolios(JSON.parse(raw));
   } catch (err) {
     console.error("Failed to load portfolios:", err);
     return {};
@@ -115,16 +128,18 @@ function loadPortfolios() {
 
 function savePortfolios(portfolios) {
   try {
-    fs.writeFileSync(PORTFOLIO_PATH, JSON.stringify(portfolios, null, 2), "utf8");
+    ensureDirForFile(PORTFOLIO_PATH);
+    const normalized = normalizePortfolios(portfolios);
+    const tmp = `${PORTFOLIO_PATH}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(normalized, null, 2), "utf8");
+    fs.renameSync(tmp, PORTFOLIO_PATH);
   } catch (err) {
     console.error("Failed to save portfolios:", err);
   }
 }
 
-// ---- JUSTTCG HELPER (mirrors updatePrices.js logic) ----
-
+// ---- JUSTTCG (sealed-first logic, matches updater behavior) ----
 async function fetchCardPrices(tcgplayerIds) {
-  // Deduplicate IDs and normalize to strings
   const uniqueIds = Array.from(
     new Set(
       (tcgplayerIds || [])
@@ -135,11 +150,8 @@ async function fetchCardPrices(tcgplayerIds) {
 
   const idToPrice = {}; // id -> { marketPrice, setName, name }
 
-  if (!uniqueIds.length) {
-    return idToPrice;
-  }
+  if (!uniqueIds.length) return idToPrice;
 
-  // Chunk into batches of BATCH_SIZE
   for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
     const batch = uniqueIds.slice(i, i + BATCH_SIZE);
 
@@ -150,12 +162,14 @@ async function fetchCardPrices(tcgplayerIds) {
           "Content-Type": "application/json",
           "X-Api-Key": JUSTTCG_API_KEY,
         },
-        body: JSON.stringify({ tcgplayerIds: batch }),
+        // KEY CHANGE: send raw array, not { tcgplayerIds: [...] }
+        body: JSON.stringify(batch),
       });
 
       if (!res.ok) {
+        const text = await res.text().catch(() => "");
         console.error(
-          `JustTCG batch request failed: ${res.status} ${res.statusText}`
+          `JustTCG batch request failed: ${res.status} ${res.statusText} ${text}`
         );
         continue;
       }
@@ -163,19 +177,36 @@ async function fetchCardPrices(tcgplayerIds) {
       const result = await res.json();
       const cards = Array.isArray(result) ? result : result.data || [];
 
-      for (const card of cards) {
-        if (!card || !card.tcgplayer_id) continue;
+      if (DEBUG_JUSTTCG) {
+        console.log(
+          `[JustTCG] Batch ${Math.floor(i / BATCH_SIZE) + 1}: requested=${batch.length} returned=${cards.length}`
+        );
+      }
 
-        const id = String(card.tcgplayer_id);
+      for (const card of cards) {
+        if (!card) continue;
+
+        // Be defensive about id naming across responses
+        const rawId =
+          card.tcgplayerId ??
+          card.tcgplayer_id ??
+          card.tcgPlayerId ??
+          card.tcgPlayerID ??
+          null;
+
+        if (!rawId) continue;
+
+        const id = String(rawId);
         const variants = card.variants || [];
 
-        let variant =
+        // IMPORTANT: sealed-first
+        const variant =
           variants.find((v) => v && v.condition === "Sealed") || variants[0];
 
         if (!variant || variant.price == null) {
           idToPrice[id] = {
             marketPrice: null,
-            setName: card.set_name || null,
+            setName: card.set_name || card.setName || null,
             name: card.name || null,
           };
           continue;
@@ -185,7 +216,7 @@ async function fetchCardPrices(tcgplayerIds) {
         if (!Number.isFinite(price) || price <= 0 || price > 10000) {
           idToPrice[id] = {
             marketPrice: null,
-            setName: card.set_name || null,
+            setName: card.set_name || card.setName || null,
             name: card.name || null,
           };
           continue;
@@ -193,7 +224,7 @@ async function fetchCardPrices(tcgplayerIds) {
 
         idToPrice[id] = {
           marketPrice: price,
-          setName: card.set_name || null,
+          setName: card.set_name || card.setName || null,
           name: card.name || null,
         };
       }
@@ -205,13 +236,11 @@ async function fetchCardPrices(tcgplayerIds) {
   return idToPrice;
 }
 
-// ---- COMMAND HANDLERS ----
-
-// !inventoryadd <id> "Label" [<id> "Label"...]
+// ---- COMMANDS ----
 async function handleInventoryAdd(message, argsStr) {
   if (!argsStr) {
     return message.reply(
-      "Usage: `!inventoryadd <tcgplayerId> \"Label\" [<tcgplayerId> \"Label\" ...]`"
+      'Usage: `!inventoryadd <tcgplayerId> "Label" [<tcgplayerId> "Label" ...]`'
     );
   }
 
@@ -219,17 +248,15 @@ async function handleInventoryAdd(message, argsStr) {
   const regex = /(\d+)\s+"([^"]+)"/g;
   let match;
   while ((match = regex.exec(argsStr)) !== null) {
-    const id = match[1];
+    const tcgplayerId = match[1];
     const label = match[2].trim();
-    if (id && label) {
-      pairs.push({ id, label });
-    }
+    if (tcgplayerId && label) pairs.push({ tcgplayerId, label });
   }
 
   if (!pairs.length) {
     return message.reply(
-      "I couldn't parse any `<id> \"Label\"` pairs. Example:\n" +
-        "`!inventoryadd 543843 \"Booster Box\" 543844 \"Booster Bundle\"`"
+      "I couldn't parse any `<id> \"Label\"` pairs.\nExample:\n" +
+        '`!inventoryadd 543843 "Booster Box" 543844 "Booster Bundle"`'
     );
   }
 
@@ -237,184 +264,119 @@ async function handleInventoryAdd(message, argsStr) {
   const portfolios = loadPortfolios();
   const current = portfolios[userId] || [];
 
-  for (const { id, label } of pairs) {
-    const existingIndex = current.findIndex((item) => item.id === id);
-    if (existingIndex !== -1) {
-      current[existingIndex].label = label;
-    } else {
-      current.push({ id, label });
-    }
-  }
+  const map = new Map();
+  for (const item of current) map.set(item.tcgplayerId, item);
+  for (const p of pairs) map.set(p.tcgplayerId, { tcgplayerId: p.tcgplayerId, label: p.label });
 
-  portfolios[userId] = current;
+  portfolios[userId] = Array.from(map.values());
   savePortfolios(portfolios);
 
-  const addedList = pairs.map((p) => `${p.id} – "${p.label}"`).join("\n");
   await message.reply(
-    `✅ Updated your watchlist with:\n${addedList}\n\nYou now have ${current.length} item(s) tracked.`
+    `✅ Updated your watchlist.\nYou now track ${portfolios[userId].length} item(s).`
   );
 }
 
-// !inventorylist – DM the user their current list (with latest prices)
+async function handleInventoryRemove(message, argsStr) {
+  const id = argsStr.trim();
+  if (!id) return message.reply("Usage: `!inventoryremove <tcgplayerId>`");
+
+  const userId = message.author.id;
+  const portfolios = loadPortfolios();
+  const current = portfolios[userId] || [];
+  const next = current.filter((item) => item.tcgplayerId !== id);
+
+  portfolios[userId] = next;
+  savePortfolios(portfolios);
+
+  await message.reply(`🗑 Removed \`${id}\`. You now track ${next.length} item(s).`);
+}
+
 async function handleInventoryList(message) {
   const userId = message.author.id;
   const portfolios = loadPortfolios();
   const list = portfolios[userId] || [];
 
-  if (!list.length) {
-    return message.reply("You don't have any items in your watchlist yet.");
-  }
+  if (!list.length) return message.reply("Your watchlist is empty.");
 
-  const ids = list.map((item) => item.id);
+  const ids = list.map((i) => i.tcgplayerId);
   const prices = await fetchCardPrices(ids);
 
-  let lines = [];
-  for (const item of list) {
-    const p = prices[item.id] || {};
+  const lines = list.map((item) => {
+    const p = prices[item.tcgplayerId] || {};
     const name = p.name || item.label || "(unknown)";
     const setName = p.setName ? ` [${p.setName}]` : "";
-    const priceText =
-      p.marketPrice != null ? `$${p.marketPrice.toFixed(2)}` : "N/A";
-
-    lines.push(
-      `• ${name}${setName}\n  ID: ${item.id} – ${item.label} – Market: ${priceText}`
-    );
-  }
+    const priceText = p.marketPrice != null ? `$${p.marketPrice.toFixed(2)}` : "N/A";
+    return `• ${name}${setName}\n  ID: ${item.tcgplayerId} – ${item.label} – Market: ${priceText}`;
+  });
 
   try {
-    await message.author.send(
-      `📊 Your tracked items:\n\n` + lines.join("\n\n")
-    );
-    if (message.channel.type !== 1) {
-      // If not already DM, acknowledge in-channel.
-      await message.reply("I've sent you a DM with your watchlist.");
-    }
+    await message.author.send(`📊 Your tracked items:\n\n${lines.join("\n\n")}`);
+    if (message.guild) await message.reply("✅ Sent you a DM with your watchlist.");
   } catch (err) {
-    console.error("Failed to DM user list:", err);
-    await message.reply(
-      "I couldn't DM you. Please make sure your DMs are open and try again."
-    );
+    console.error("Failed to DM list:", err);
+    await message.reply("I couldn't DM you — check your DM privacy settings.");
   }
 }
 
-// !inventoryremove <id>
-async function handleInventoryRemove(message, argsStr) {
-  const userId = message.author.id;
-  const id = argsStr.trim();
-
-  if (!id) {
-    return message.reply("Usage: `!inventoryremove <tcgplayerId>`");
-  }
-
-  const portfolios = loadPortfolios();
-  const current = portfolios[userId] || [];
-  const next = current.filter((item) => item.id !== id);
-  const removedCount = current.length - next.length;
-
-  portfolios[userId] = next;
-  savePortfolios(portfolios);
-
-  if (!removedCount) {
-    return message.reply(
-      `I didn't find ID \`${id}\` in your watchlist. You currently have ${next.length} item(s).`
-    );
-  }
-
-  await message.reply(
-    `🗑 Removed ID \`${id}\` from your watchlist. You now have ${next.length} item(s).`
-  );
-}
-
-// !inventorynow – on-demand price fetch for this user (2h cooldown, server admin override)
 async function handleInventoryNow(message) {
   const userId = message.author.id;
   const now = Date.now();
 
-  // Determine if user is admin (server admin only)
   let isAdmin = false;
   if (message.guild && message.member) {
     try {
-      isAdmin = message.member.permissions.has(
-        PermissionsBitField.Flags.Administrator
-      );
-    } catch (err) {
+      isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
+    } catch (_) {
       isAdmin = false;
     }
   }
 
   if (!isAdmin) {
-    const lastRun = lastOnDemandRun[userId] || 0;
-    const elapsed = now - lastRun;
+    const last = lastOnDemandRun[userId] || 0;
+    const elapsed = now - last;
     if (elapsed < ON_DEMAND_COOLDOWN_MS) {
-      const remainingMs = ON_DEMAND_COOLDOWN_MS - elapsed;
-      const remainingMin = Math.ceil(remainingMs / 60000);
-      return message.reply(
-        `⏳ You can only use \`!inventorynow\` every 2 hours. Please try again in ~${remainingMin} minute(s).`
-      );
+      const mins = Math.ceil((ON_DEMAND_COOLDOWN_MS - elapsed) / 60000);
+      return message.reply(`⏳ Cooldown: try again in ~${mins} minute(s).`);
     }
-
     lastOnDemandRun[userId] = now;
   }
 
   const portfolios = loadPortfolios();
   const list = portfolios[userId] || [];
-
   if (!list.length) {
-    return message.reply(
-      "You don't have any items in your watchlist yet. Use `!inventoryadd` first."
-    );
+    return message.reply("Your watchlist is empty. Use `!inventoryadd` first.");
   }
 
-  const ids = list.map((item) => item.id);
+  const ids = list.map((i) => i.tcgplayerId);
   const prices = await fetchCardPrices(ids);
 
-  let lines = [];
-  for (const item of list) {
-    const p = prices[item.id] || {};
+  const lines = list.map((item) => {
+    const p = prices[item.tcgplayerId] || {};
     const name = p.name || item.label || "(unknown)";
     const setName = p.setName ? ` [${p.setName}]` : "";
-    const priceText =
-      p.marketPrice != null ? `$${p.marketPrice.toFixed(2)}` : "N/A";
-
-    lines.push(
-      `• ${name}${setName}\n  ID: ${item.id} – ${item.label} – Market: ${priceText}`
-    );
-  }
+    const priceText = p.marketPrice != null ? `$${p.marketPrice.toFixed(2)}` : "N/A";
+    return `• ${name}${setName}\n  ID: ${item.tcgplayerId} – ${item.label} – Market: ${priceText}`;
+  });
 
   try {
-    await message.author.send(
-      `⚡ On-demand price check:\n\n` + lines.join("\n\n")
-    );
-    if (message.channel.type !== 1) {
-      await message.reply("I've sent you a DM with your latest prices.");
-    }
+    await message.author.send(`⚡ On-demand price check:\n\n${lines.join("\n\n")}`);
+    if (message.guild) await message.reply("✅ Sent you a DM with your on-demand prices.");
   } catch (err) {
-    console.error("Failed to DM user now-prices:", err);
-    await message.reply(
-      "I couldn't DM you. Please make sure your DMs are open and try again."
-    );
+    console.error("Failed to DM now:", err);
+    await message.reply("I couldn't DM you — check your DM privacy settings.");
   }
 }
 
-// ---- DAILY CRON JOB (10:00) ----
-
+// ---- DAILY JOB ----
 cron.schedule("0 10 * * *", async () => {
-  console.log("[Cron] Running daily price updates for all users...");
+  console.log("[Cron] Daily portfolio price DM starting...");
+
   const portfolios = loadPortfolios();
   const entries = Object.entries(portfolios);
-
-  if (!entries.length) {
-    console.log("[Cron] No users in portfolios, skipping.");
-    return;
-  }
+  if (!entries.length) return;
 
   const allIds = Array.from(
-    new Set(
-      entries
-        .flatMap(([userId, items]) => (items || []).map((item) => item.id))
-        .filter(Boolean)
-        .map((id) => String(id))
-    )
+    new Set(entries.flatMap(([, items]) => (items || []).map((it) => it.tcgplayerId)).filter(Boolean))
   );
 
   const prices = await fetchCardPrices(allIds);
@@ -422,48 +384,32 @@ cron.schedule("0 10 * * *", async () => {
   for (const [userId, items] of entries) {
     if (!items || !items.length) continue;
 
-    const userItems = items;
-    let lines = [];
-
-    for (const item of userItems) {
-      const p = prices[item.id] || {};
+    const lines = items.map((item) => {
+      const p = prices[item.tcgplayerId] || {};
       const name = p.name || item.label || "(unknown)";
       const setName = p.setName ? ` [${p.setName}]` : "";
-      const priceText =
-        p.marketPrice != null ? `$${p.marketPrice.toFixed(2)}` : "N/A";
-
-      lines.push(
-        `• ${name}${setName}\n  ID: ${item.id} – ${item.label} – Market: ${priceText}`
-      );
-    }
+      const priceText = p.marketPrice != null ? `$${p.marketPrice.toFixed(2)}` : "N/A";
+      return `• ${name}${setName}\n  ID: ${item.tcgplayerId} – ${item.label} – Market: ${priceText}`;
+    });
 
     try {
       const user = await client.users.fetch(userId);
-      await user.send(
-        `📅 Daily price update:\n\n` + lines.join("\n\n")
-      );
+      await user.send(`📅 Daily price update:\n\n${lines.join("\n\n")}`);
     } catch (err) {
-      console.error(`Failed to DM daily update to user ${userId}:`, err);
+      console.error(`Failed daily DM to ${userId}:`, err);
     }
   }
 });
 
-// ---- MESSAGE HANDLER ----
-
+// ---- HANDLER ----
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(CMD_PREFIX)) return;
 
-  // Access control: block unauthorized users/servers.
   if (!isUserAllowed(message)) {
-    // If you prefer total silence for blocked users, comment this out.
     try {
-      await message.reply(
-        "Sorry, this bot is currently restricted and you are not authorized to use it."
-      );
-    } catch (err) {
-      console.error("Failed to send unauthorized message:", err);
-    }
+      await message.reply("This bot is currently restricted; you are not authorized.");
+    } catch (_) {}
     return;
   }
 
@@ -473,36 +419,25 @@ client.on("messageCreate", async (message) => {
     firstSpace === -1
       ? withoutPrefix.toLowerCase()
       : withoutPrefix.slice(0, firstSpace).toLowerCase();
-  const argsStr =
-    firstSpace === -1 ? "" : withoutPrefix.slice(firstSpace + 1).trim();
+  const argsStr = firstSpace === -1 ? "" : withoutPrefix.slice(firstSpace + 1).trim();
 
   try {
-    if (cmd === "inventoryadd") {
-      await handleInventoryAdd(message, argsStr);
-    } else if (cmd === "inventorylist") {
-      await handleInventoryList(message);
-    } else if (cmd === "inventoryremove") {
-      await handleInventoryRemove(message, argsStr);
-    } else if (cmd === "inventorynow") {
-      await handleInventoryNow(message);
-    }
+    if (cmd === "inventoryadd") return await handleInventoryAdd(message, argsStr);
+    if (cmd === "inventoryremove") return await handleInventoryRemove(message, argsStr);
+    if (cmd === "inventorylist") return await handleInventoryList(message);
+    if (cmd === "inventorynow") return await handleInventoryNow(message);
   } catch (err) {
-    console.error("Error handling command:", err);
+    console.error("Command error:", err);
     try {
-      await message.reply(
-        "Something went wrong while processing that command. Please try again later."
-      );
-    } catch (_) {
-      // ignore
-    }
+      await message.reply("Something went wrong. Try again later.");
+    } catch (_) {}
   }
 });
 
-// ---- READY / LOGIN ----
-
 client.once("ready", () => {
   console.log(`Bot logged in as ${client.user.tag}`);
-  console.log("Daily job scheduled at 10:00.");
+  console.log(`Portfolio path: ${PORTFOLIO_PATH}`);
+  console.log("Daily cron: 0 10 * * *");
 });
 
 client.login(DISCORD_BOT_TOKEN);

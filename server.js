@@ -1,5 +1,6 @@
-// server.js - No live JustTCG calls.
-// Serves inventory + admin with Discord stock alerts.
+// server.js - Serves inventory + admin with Discord stock alerts.
+// Updated behavior: Discord alerts trigger on ANY quantity increase (restock),
+// not only 0 -> >0.
 
 require("dotenv").config();
 const express = require("express");
@@ -21,6 +22,7 @@ const INVENTORY_PATH = path.join(__dirname, "inventory.json");
 
 app.use(express.json());
 
+// ---------- Helpers ----------
 function sendDiscordMessage(webhookUrl, content) {
   if (!webhookUrl || !content) return;
   if (typeof fetch !== "function") return;
@@ -57,14 +59,20 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// ---------- Routes ----------
+
+// Protect /admin.html explicitly BEFORE static middleware
 app.get("/admin.html", requireAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 
+// Static frontend
 app.use(express.static(path.join(__dirname, "public")));
 
+// Public inventory (only qty > 0)
 app.get("/api/inventory", (req, res) => {
   const inv = loadInventoryItems(INVENTORY_PATH);
+
   const filtered = inv.filter((i) => (i.quantity ?? 0) > 0);
 
   filtered.sort((a, b) => {
@@ -83,11 +91,13 @@ app.get("/api/inventory", (req, res) => {
   res.json(filtered);
 });
 
+// Admin raw inventory
 app.get("/api/raw-inventory", requireAdmin, (req, res) => {
   const inv = loadInventoryItems(INVENTORY_PATH);
   res.json(inv);
 });
 
+// Admin save inventory + Discord restock alert
 app.post("/api/inventory", requireAdmin, (req, res) => {
   const payload = req.body;
 
@@ -97,6 +107,7 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
 
   const oldInventory = loadInventoryItems(INVENTORY_PATH);
 
+  // Index old inventory
   const existingById = new Map();
   const existingByName = new Map();
 
@@ -107,26 +118,20 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
   }
 
   const nextInventory = [];
-  const newItems = [];
+  const restocks = []; // { item, delta, newQty, oldQty }
 
   for (const row of payload) {
     if (!row) continue;
 
-    const name = String(row.name || "").trim();
-    const tcgId = String(row.tcgPlayerId || "").trim();
+    const nameRaw = row.name || "";
+    const idRaw = row.tcgPlayerId || "";
+    const qtyRaw = row.quantity;
+    const gameRaw = (row.game || "").trim().toLowerCase();
 
-    // allow pricingPercent from admin (optional)
-    const pricingRaw = row.pricingPercent;
-    let pricingPercent = null;
-    if (pricingRaw !== null && pricingRaw !== undefined && pricingRaw !== "") {
-      const n = Number(pricingRaw);
-      if (Number.isFinite(n)) {
-        pricingPercent = Math.max(1, Math.min(200, Math.round(n * 100) / 100));
-      }
-    }
+    const name = typeof nameRaw === "string" ? nameRaw.trim() : String(nameRaw || "").trim();
+    const tcgId = typeof idRaw === "string" ? idRaw.trim() : String(idRaw || "").trim();
 
     let quantity = 0;
-    const qtyRaw = row.quantity;
     if (qtyRaw === "" || qtyRaw === null || qtyRaw === undefined) {
       quantity = 0;
     } else {
@@ -134,47 +139,46 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
       quantity = Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0;
     }
 
-    const gameRaw = String(row.game || "").trim().toLowerCase();
+    // Normalize game text a bit
     let game = null;
     if (gameRaw === "pokemon" || gameRaw === "pokémon" || gameRaw === "poke") game = "pokemon";
     else if (gameRaw === "magic" || gameRaw === "mtg" || gameRaw === "magic: the gathering") game = "mtg";
     else if (gameRaw === "other" || gameRaw === "misc") game = "other";
     else if (gameRaw) game = gameRaw;
 
+    // Skip rows that are effectively empty
     if (!name && !tcgId) continue;
 
-    let existing =
+    const existing =
       (tcgId && existingById.get(tcgId)) ||
       (name && existingByName.get(name.toLowerCase())) ||
       null;
 
     if (existing) {
+      const oldQty = Number(existing.quantity || 0);
+      const newQty = quantity;
+
       const updated = {
         ...existing,
         name: name || existing.name,
         tcgPlayerId: tcgId || existing.tcgPlayerId,
-        quantity,
+        quantity: newQty,
         game: game !== null ? game : existing.game || null,
+        // NOTE: leave other fields intact (pricingPercent, prices, urls, etc.)
       };
-
-      // Only set pricingPercent if provided; otherwise keep whatever existing had
-      if (pricingPercent !== null) updated.pricingPercent = pricingPercent;
-      if (pricingPercent === null && "pricingPercent" in updated) {
-        // leave as-is (do nothing)
-      }
 
       nextInventory.push(updated);
 
-      const wasQty = Number(existing.quantity || 0);
-      if (wasQty <= 0 && quantity > 0) newItems.push(updated);
+      const delta = newQty - oldQty;
+      if (delta > 0) {
+        restocks.push({ item: updated, delta, newQty, oldQty });
+      }
     } else {
       const created = {
         name: name || "Unnamed product",
         tcgPlayerId: tcgId || null,
         quantity,
         game: game || null,
-        pricingPercent: pricingPercent !== null ? pricingPercent : null,
-
         marketPrice: null,
         yourPrice: null,
         lastUpdated: null,
@@ -183,10 +187,14 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
       };
 
       nextInventory.push(created);
-      if (quantity > 0) newItems.push(created);
+
+      if (quantity > 0) {
+        restocks.push({ item: created, delta: quantity, newQty: quantity, oldQty: 0 });
+      }
     }
   }
 
+  // Enforce schema + normalize
   const normalizedNext = normalizeItems(nextInventory);
 
   try {
@@ -196,14 +204,14 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
     return res.status(500).json({ error: "Failed to save inventory" });
   }
 
-  if (newItems.length > 0 && DISCORD_STOCK_WEBHOOK) {
-    const header = `📦 New stock added! Items: ${newItems.length}\n\n`;
-    const lines = newItems.map((item) => {
+  // Discord restock alert (ANY increases)
+  if (restocks.length > 0 && DISCORD_STOCK_WEBHOOK) {
+    // Keep it readable and consistent
+    const header = `📦 Stock updated (${restocks.length} item${restocks.length === 1 ? "" : "s"}):\n\n`;
+    const lines = restocks.map(({ item, delta, newQty }) => {
       const base = item.name || "Unnamed product";
       const idPart = item.tcgPlayerId ? ` [${item.tcgPlayerId}]` : "";
-      const qtyPart = ` x${item.quantity ?? 0}`;
-      const gamePart = item.game ? ` (${item.game})` : "";
-      return `• ${base}${idPart}${qtyPart}${gamePart}`;
+      return `• ${base}${idPart} +${delta} (now ${newQty})`;
     });
 
     let body = lines.join("\n");
@@ -214,16 +222,17 @@ app.post("/api/inventory", requireAdmin, (req, res) => {
   res.json({
     ok: true,
     totalItems: normalizedNext.length,
-    newItems: newItems.map((i) => ({
-      name: i.name,
-      tcgPlayerId: i.tcgPlayerId,
-      quantity: i.quantity,
-      game: i.game || null,
-      pricingPercent: i.pricingPercent ?? null,
+    restocks: restocks.map((r) => ({
+      name: r.item.name,
+      tcgPlayerId: r.item.tcgPlayerId,
+      delta: r.delta,
+      newQty: r.newQty,
+      oldQty: r.oldQty,
     })),
   });
 });
 
+// ---------- Start ----------
 app.listen(PORT, function () {
   console.log("Server running at http://localhost:" + PORT);
 });
