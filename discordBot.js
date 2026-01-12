@@ -11,6 +11,10 @@
 // - Shows change since added/baseline ($ + %)
 //
 // Adds: !inventorystats
+//
+// IMPORTANT CHANGE (per your request):
+// - !inventoryadd does NOT call JustTCG (no API usage on add)
+// - !inventorynow is once-per-day per user, reset at 12:00 AM America/New_York
 
 require("dotenv").config();
 const fs = require("fs");
@@ -56,10 +60,12 @@ if (typeof fetch !== "function") {
 
 const CMD_PREFIX = "!";
 const BATCH_SIZE = 20;
-const ON_DEMAND_COOLDOWN_MS = 2 * 60 * 60 * 1000;
-const lastOnDemandRun = {}; // userId -> timestamp
 
-// Optional alert config (not required for your ask, but left ready if you want later)
+// Once-per-day on-demand limit, keyed by Eastern date
+const ON_DEMAND_TZ = "America/New_York";
+const lastOnDemandDayKey = {}; // userId -> "YYYY-MM-DD" in America/New_York
+
+// Optional alert config (disabled unless PRICE_ALERT_PCT > 0)
 const PRICE_ALERT_PCT = Number(process.env.PRICE_ALERT_PCT ?? 0); // 0 disables
 const ALERT_COOLDOWN_HOURS = Number(process.env.ALERT_COOLDOWN_HOURS ?? 12);
 
@@ -236,6 +242,20 @@ function parseAddPairs(input) {
   return pairs;
 }
 
+// ---- TIME HELPERS ----
+// Returns Eastern date key like "2026-01-12" (America/New_York), resets at midnight Eastern.
+function getEasternDayKey(date = new Date()) {
+  // Use Intl to get parts in America/New_York
+  const dtf = new Intl.DateTimeFormat("en-CA", {
+    timeZone: ON_DEMAND_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  // en-CA with these options yields YYYY-MM-DD
+  return dtf.format(date);
+}
+
 // ---- DM SENDER (splits long messages safely) ----
 async function safeSendDM(user, text) {
   const MAX = 1900; // keep below Discord 2000 limit
@@ -243,7 +263,6 @@ async function safeSendDM(user, text) {
 
   let remaining = String(text || "");
   while (remaining.length > MAX) {
-    // Try splitting on double newline first
     let idx = remaining.lastIndexOf("\n\n", MAX);
     if (idx < 800) idx = remaining.lastIndexOf("\n", MAX);
     if (idx < 800) idx = MAX;
@@ -389,7 +408,7 @@ function persistPricesForUser(userId, items, prices, checkedIso, options = {}) {
       if (cur != null) {
         existing.lastMarketPrice = cur;
 
-        // If baseline missing, lock it now
+        // If baseline missing, lock it now (first successful price fetch)
         if (existing.addedMarketPrice == null || !Number.isFinite(Number(existing.addedMarketPrice))) {
           existing.addedMarketPrice = cur;
           existing.addedAt = existing.addedAt || checkedIso;
@@ -420,17 +439,14 @@ function buildPriceLines(items, prices) {
 
     const priceText = cur != null ? fmtMoney(cur) : "N/A";
 
-    // since last check
     let sinceLastText = "Δ since last: N/A";
     const d1 = calcDelta(cur, last);
     if (d1 && d1.pct != null) {
       sinceLastText = `Δ since last: ${fmtSignedMoney(d1.delta)} (${fmtSignedPct(d1.pct)})`;
     } else if (d1) {
-      // last was 0 (unlikely), still show dollars
       sinceLastText = `Δ since last: ${fmtSignedMoney(d1.delta)} (N/A%)`;
     }
 
-    // since added baseline
     let sinceAddedText = "Δ since added: N/A";
     const d0 = calcDelta(cur, added);
     if (d0 && d0.pct != null) {
@@ -455,7 +471,8 @@ async function handleInventoryAdd(message, argsText) {
   const userId = message.author.id;
   const nowIso = new Date().toISOString();
 
-  // Upsert items, preserve existing baselines
+  // IMPORTANT: No API calls here (per your request).
+  // We only store the watchlist items. Baselines/last prices get populated on the next daily cron or !inventorynow.
   upsertUserItems(userId, (current) => {
     const map = new Map((current || []).map((it) => [it.tcgplayerId, it]));
     for (const p of pairs) {
@@ -470,41 +487,9 @@ async function handleInventoryAdd(message, argsText) {
     return Array.from(map.values());
   });
 
-  // Try to fetch prices immediately so "since added" baseline is set ASAP
-  try {
-    const idsToFetch = Array.from(new Set(pairs.map((p) => p.tcgplayerId)));
-    const prices = await fetchCardPrices(idsToFetch);
-
-    const portfolios = loadPortfolios();
-    const items = portfolios[userId] || [];
-    const byId = new Map(items.map((it) => [it.tcgplayerId, it]));
-
-    for (const id of idsToFetch) {
-      const it = byId.get(id);
-      if (!it) continue;
-
-      const cur = prices[id]?.marketPrice;
-      const mp = cur != null ? Number(cur) : null;
-
-      it.lastCheckedAt = nowIso;
-      if (mp != null) {
-        it.lastMarketPrice = mp;
-        if (it.addedMarketPrice == null || !Number.isFinite(Number(it.addedMarketPrice))) {
-          it.addedMarketPrice = mp;
-          it.addedAt = it.addedAt || nowIso;
-        }
-      }
-
-      byId.set(id, it);
-    }
-
-    portfolios[userId] = Array.from(byId.values());
-    savePortfolios(portfolios);
-  } catch (err) {
-    console.error("Baseline fetch failed on add:", err);
-  }
-
-  return message.reply(`✅ Added/updated ${pairs.length} item(s). Use !inventorylist to view.`);
+  return message.reply(
+    `✅ Added/updated ${pairs.length} item(s). Baseline price will populate after your next daily update or !inventorynow.`
+  );
 }
 
 async function handleInventoryList(message) {
@@ -544,13 +529,15 @@ async function handleInventoryRemove(message, argsText) {
   savePortfolios(portfolios);
 
   const removed = before !== portfolios[userId].length;
-  return message.reply(removed ? `🗑️ Removed ID ${id}. Use !inventorylist to confirm.` : `⚠️ ID ${id} was not in your watchlist.`);
+  return message.reply(
+    removed ? `🗑️ Removed ID ${id}. Use !inventorylist to confirm.` : `⚠️ ID ${id} was not in your watchlist.`
+  );
 }
 
 async function handleInventoryNow(message) {
   const userId = message.author.id;
-  const now = Date.now();
 
+  // Admin bypass (guild admins only)
   let isAdmin = false;
   if (message.guild && message.member) {
     try {
@@ -560,14 +547,19 @@ async function handleInventoryNow(message) {
     }
   }
 
+  // Once-per-day limit for non-admins, reset at midnight America/New_York
   if (!isAdmin) {
-    const last = lastOnDemandRun[userId] || 0;
-    const elapsed = now - last;
-    if (elapsed < ON_DEMAND_COOLDOWN_MS) {
-      const mins = Math.ceil((ON_DEMAND_COOLDOWN_MS - elapsed) / 60000);
-      return message.reply(`⏳ Cooldown: try again in ~${mins} minute(s).`);
+    const todayKey = getEasternDayKey(new Date());
+    const lastKey = lastOnDemandDayKey[userId] || null;
+
+    if (lastKey === todayKey) {
+      return message.reply(
+        `⏳ You already used your on-demand update for today (resets at 12:00 AM Eastern).`
+      );
     }
-    lastOnDemandRun[userId] = now;
+
+    // Mark as used for today
+    lastOnDemandDayKey[userId] = todayKey;
   }
 
   const portfolios = loadPortfolios();
@@ -602,7 +594,6 @@ async function handleInventoryStats(message) {
   const prices = await fetchCardPrices(ids);
   const checkedIso = new Date().toISOString();
 
-  // Build per-item stats
   const rows = list.map((item) => {
     const p = prices[item.tcgplayerId] || {};
     const cur = p.marketPrice != null ? Number(p.marketPrice) : null;
@@ -630,7 +621,6 @@ async function handleInventoryStats(message) {
   const totalBaseline = withBase.reduce((sum, r) => sum + Number(r.base), 0);
   const totalDelta = withBase.reduce((sum, r) => sum + Number(r.deltaSinceAdded), 0);
 
-  // Winners/losers by % since added
   const ranked = withBase
     .filter((r) => r.pctSinceAdded != null)
     .slice()
@@ -640,7 +630,6 @@ async function handleInventoryStats(message) {
   const topLosers = ranked.slice(-3).reverse();
 
   const lines = [];
-
   lines.push(`📊 Inventory Stats`);
   lines.push(`As of: ${checkedIso}`);
   lines.push("");
@@ -685,7 +674,7 @@ async function handleInventoryStats(message) {
     }
   }
 
-  // Persist baseline/last if missing (so stats helps “train” baselines too)
+  // Persist baseline/last if missing (stats call also "trains" baselines)
   persistPricesForUser(userId, list, prices, checkedIso);
 
   try {
@@ -698,7 +687,7 @@ async function handleInventoryStats(message) {
 }
 
 // ---- DAILY CRON ----
-cron.schedule("0 16 * * *", async () => {
+cron.schedule("0 10 * * *", async () => {
   console.log("[Cron] Daily portfolio price DM starting...");
   const portfolios = loadPortfolios();
   const entries = Object.entries(portfolios);
@@ -727,21 +716,14 @@ cron.schedule("0 16 * * *", async () => {
         const lastAlertedAt = item.lastAlertedAt ? new Date(item.lastAlertedAt).getTime() : 0;
         const canAlert = Date.now() - lastAlertedAt >= alertCooldownMs;
 
-        if (
-          d1 &&
-          d1.pct != null &&
-          Math.abs(d1.pct) >= PRICE_ALERT_PCT &&
-          canAlert
-        ) {
+        if (d1 && d1.pct != null && Math.abs(d1.pct) >= PRICE_ALERT_PCT && canAlert) {
           item.__shouldAlert = true;
         }
       }
     }
 
-    // Build lines with deltas
     const lines = buildPriceLines(items, prices);
 
-    // Persist last/baseline values (and alert timestamps if enabled)
     persistPricesForUser(userId, items, prices, checkedIso, { allowAlertUpdate: PRICE_ALERT_PCT > 0 });
 
     try {
@@ -789,6 +771,7 @@ client.once(Events.ClientReady, () => {
   console.log(`Portfolio path: ${PORTFOLIO_PATH}`);
   console.log(`ALLOWED_GUILD_IDS=${ALLOWED_GUILD_IDS.join(",") || "(none)"}`);
   console.log(`ALLOWED_USER_IDS=${ALLOWED_USER_IDS.join(",") || "(none)"}`);
+  console.log(`On-demand limit: once per day (reset at 12:00 AM ${ON_DEMAND_TZ})`);
 });
 
 client.login(DISCORD_BOT_TOKEN);
