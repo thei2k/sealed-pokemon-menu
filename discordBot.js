@@ -12,9 +12,15 @@
 //
 // Adds: !inventorystats
 //
-// IMPORTANT CHANGE (per your request):
+// IMPORTANT (per your request):
 // - !inventoryadd does NOT call JustTCG (no API usage on add)
 // - !inventorynow is once-per-day per user, reset at 12:00 AM America/New_York
+//
+// NEW (per your request):
+// - !inventoryadd supports ID-only bulk adds:
+//     !inventoryadd 123 124 125
+//   Labels must be quoted if provided:
+//     !inventoryadd 123 "Booster Box" 124 "ETB"
 
 require("dotenv").config();
 const fs = require("fs");
@@ -224,36 +230,71 @@ function savePortfolios(portfolios) {
   }
 }
 
-// ---- PARSING HELPERS ----
-// Parses: !inventoryadd 543843 "Booster Box" 543844 "Booster Bundle"
-function parseAddPairs(input) {
+// ---- TOKENIZER / PARSING HELPERS ----
+// Supports quoted labels. Key behavior:
+// - If there are ANY quotes in the input, we treat it as: id "label" id "label"...
+// - If there are NO quotes, we treat EVERY token as an ID (bulk add): id id id...
+function tokenizeWithQuotes(input) {
   const tokens = [];
   const re = /"([^"]*)"|(\S+)/g;
   let m;
-  while ((m = re.exec(input)) !== null) tokens.push(m[1] != null ? m[1] : m[2]);
-
-  const pairs = [];
-  for (let i = 0; i < tokens.length; i += 2) {
-    const id = (tokens[i] || "").trim();
-    const label = (tokens[i + 1] || "").trim();
-    if (!id) continue;
-    pairs.push({ tcgplayerId: id, label: label || "" });
+  while ((m = re.exec(input)) !== null) {
+    if (m[1] != null) tokens.push({ value: m[1], quoted: true });
+    else tokens.push({ value: m[2], quoted: false });
   }
-  return pairs;
+  return tokens;
+}
+
+function parseAddItems(input) {
+  const rawTokens = tokenizeWithQuotes(input || "");
+
+  // Clean tokens (strip commas sometimes pasted in lists)
+  const tokens = rawTokens
+    .map((t) => ({ value: String(t.value || "").trim().replace(/,+$/g, ""), quoted: t.quoted }))
+    .filter((t) => t.value.length > 0);
+
+  if (!tokens.length) return [];
+
+  const hasQuoted = tokens.some((t) => t.quoted);
+
+  // Mode A: labeled pairs (labels MUST be quoted)
+  if (hasQuoted) {
+    const items = [];
+    for (let i = 0; i < tokens.length; i++) {
+      const idTok = tokens[i];
+      if (!idTok) break;
+
+      const id = String(idTok.value).trim();
+      if (!id) continue;
+
+      const nextTok = tokens[i + 1];
+      const label = nextTok && nextTok.quoted ? String(nextTok.value).trim() : "";
+
+      items.push({ tcgplayerId: id, label });
+
+      // If label token was consumed, skip it
+      if (nextTok && nextTok.quoted) i += 1;
+    }
+    return items;
+  }
+
+  // Mode B: ID-only bulk add
+  return tokens.map((t) => ({
+    tcgplayerId: String(t.value).trim(),
+    label: "",
+  }));
 }
 
 // ---- TIME HELPERS ----
 // Returns Eastern date key like "2026-01-12" (America/New_York), resets at midnight Eastern.
 function getEasternDayKey(date = new Date()) {
-  // Use Intl to get parts in America/New_York
   const dtf = new Intl.DateTimeFormat("en-CA", {
     timeZone: ON_DEMAND_TZ,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
-  // en-CA with these options yields YYYY-MM-DD
-  return dtf.format(date);
+  return dtf.format(date); // YYYY-MM-DD
 }
 
 // ---- DM SENDER (splits long messages safely) ----
@@ -461,10 +502,16 @@ function buildPriceLines(items, prices) {
 
 // ---- COMMAND HANDLERS ----
 async function handleInventoryAdd(message, argsText) {
-  const pairs = parseAddPairs(argsText);
-  if (!pairs.length) {
+  const itemsToAdd = parseAddItems(argsText);
+
+  if (!itemsToAdd.length) {
     return message.reply(
-      `Usage: !inventoryadd <id> "Label" [<id> "Label" ...]\nExample: !inventoryadd 543843 "Booster Box"`
+      `Usage:\n` +
+        `• Add with labels: !inventoryadd <id> "Label" [<id> "Label" ...]\n` +
+        `• Fast add (IDs only): !inventoryadd <id> <id> <id>\n` +
+        `Examples:\n` +
+        `!inventoryadd 543843 "Booster Box" 123456 "Umbreon V Alt Art"\n` +
+        `!inventoryadd 123456 123457 123458`
     );
   }
 
@@ -472,15 +519,19 @@ async function handleInventoryAdd(message, argsText) {
   const nowIso = new Date().toISOString();
 
   // IMPORTANT: No API calls here (per your request).
-  // We only store the watchlist items. Baselines/last prices get populated on the next daily cron or !inventorynow.
+  // We only store watchlist items. Names/labels can be blank and will display using JustTCG name later.
   upsertUserItems(userId, (current) => {
     const map = new Map((current || []).map((it) => [it.tcgplayerId, it]));
-    for (const p of pairs) {
+    for (const p of itemsToAdd) {
       const existing = map.get(p.tcgplayerId);
+
+      // If user provided a label, update it. If blank label, keep existing label if present.
+      const nextLabel = p.label ? p.label : (existing?.label || "");
+
       map.set(p.tcgplayerId, {
         ...(existing || {}),
         tcgplayerId: p.tcgplayerId,
-        label: p.label,
+        label: nextLabel,
         addedAt: (existing && existing.addedAt) || nowIso,
       });
     }
@@ -488,7 +539,7 @@ async function handleInventoryAdd(message, argsText) {
   });
 
   return message.reply(
-    `✅ Added/updated ${pairs.length} item(s). Baseline price will populate after your next daily update or !inventorynow.`
+    `✅ Added/updated ${itemsToAdd.length} item(s). Baseline price will populate after your next daily update or !inventorynow.`
   );
 }
 
@@ -504,7 +555,8 @@ async function handleInventoryList(message) {
     .sort((a, b) => a.tcgplayerId.localeCompare(b.tcgplayerId))
     .map((it) => {
       const added = Number.isFinite(Number(it.addedMarketPrice)) ? fmtMoney(Number(it.addedMarketPrice)) : "N/A";
-      return `• ${it.label || "(no label)"} — ID: ${it.tcgplayerId} — Baseline: ${added}`;
+      const label = it.label && it.label.trim().length ? it.label : "(no label)";
+      return `• ${label} — ID: ${it.tcgplayerId} — Baseline: ${added}`;
     });
 
   try {
@@ -553,12 +605,9 @@ async function handleInventoryNow(message) {
     const lastKey = lastOnDemandDayKey[userId] || null;
 
     if (lastKey === todayKey) {
-      return message.reply(
-        `⏳ You already used your on-demand update for today (resets at 12:00 AM Eastern).`
-      );
+      return message.reply(`⏳ You already used your on-demand update for today (resets at 12:00 AM Eastern).`);
     }
 
-    // Mark as used for today
     lastOnDemandDayKey[userId] = todayKey;
   }
 
