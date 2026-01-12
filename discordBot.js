@@ -1,5 +1,10 @@
 // discordBot.js (FULL OVERWRITE)
-// Restores inventoryadd/inventorylist/inventoryremove + keeps inventorynow + cron
+// Access model:
+// - In guild channels: only allowed guilds in ALLOWED_GUILD_IDS (when set)
+// - In DMs: allowed if user shares ANY allowed guild with the bot (when ALLOWED_GUILD_IDS set)
+// - Optional: ALLOWED_USER_IDS always allowed (override)
+// If no allowlists are set, bot is open everywhere.
+
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
@@ -50,7 +55,7 @@ const lastOnDemandRun = {}; // userId -> timestamp
 // ---- DISCORD ----
 const client = new Client({
   intents: [
-    GatewayIntentBits.Guilds,
+    GatewayIntentBits.Guilds, // needed to see guild membership list for shared-guild DM access
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.DirectMessages,
@@ -59,23 +64,55 @@ const client = new Client({
 });
 
 // ---- ACCESS RULES ----
-// Servers: allow if guild id is in ALLOWED_GUILD_IDS (when set)
-// DMs: allow ONLY if user id in ALLOWED_USER_IDS (when set)
-// If neither allowlist is set, bot is open everywhere.
-function isMessageAllowed(message) {
-  const userId = message.author.id;
+function isGuildAllowed(guildId) {
+  if (!guildId) return false;
+  if (ALLOWED_GUILD_IDS.length === 0) return true; // no restriction
+  return ALLOWED_GUILD_IDS.includes(guildId);
+}
 
-  // If no restrictions configured, allow everything
+function isUserOverrideAllowed(userId) {
+  if (!userId) return false;
+  return ALLOWED_USER_IDS.includes(userId);
+}
+
+// DM access rule: user shares at least one allowed guild with the bot.
+// This does NOT require privileged intents; we only check the bot's cached guild list.
+async function isDmUserAllowedBySharedGuild(userId) {
+  if (ALLOWED_GUILD_IDS.length === 0) return true; // no restriction => DMs allowed
+  try {
+    // For each allowed guild the bot is in, try to fetch this member.
+    // If fetch succeeds in ANY allowed guild, user is allowed in DM.
+    for (const gid of ALLOWED_GUILD_IDS) {
+      const guild = client.guilds.cache.get(gid);
+      if (!guild) continue; // bot not in that guild (or cache not ready)
+      try {
+        await guild.members.fetch(userId);
+        return true;
+      } catch (_) {
+        // not a member (or permissions issue) -> keep checking
+      }
+    }
+    return false;
+  } catch (err) {
+    console.error("DM shared-guild check failed:", err);
+    return false;
+  }
+}
+
+async function isMessageAllowed(message) {
+  const userId = message.author?.id;
+
+  // If no restrictions configured at all, allow everything.
   if (ALLOWED_GUILD_IDS.length === 0 && ALLOWED_USER_IDS.length === 0) return true;
 
-  // Always allow explicitly allowed users (works in DM and guild)
-  if (ALLOWED_USER_IDS.includes(userId)) return true;
+  // Always allow explicitly allowed users (works in DM and guild).
+  if (isUserOverrideAllowed(userId)) return true;
 
-  // If in a guild, allow if that guild is allowlisted
-  if (message.guild) return ALLOWED_GUILD_IDS.includes(message.guild.id);
+  // In a guild: allow if guild is allowlisted.
+  if (message.guild) return isGuildAllowed(message.guild.id);
 
-  // DM and not in allowed users
-  return false;
+  // In a DM: allow if user shares any allowed guild with the bot.
+  return await isDmUserAllowedBySharedGuild(userId);
 }
 
 // ---- STORAGE ----
@@ -130,15 +167,11 @@ function savePortfolios(portfolios) {
 // ---- PARSING HELPERS ----
 // Parses: !inventoryadd 543843 "Booster Box" 543844 "Booster Bundle"
 function parseAddPairs(input) {
-  // tokenizes: numbers and quoted strings
   const tokens = [];
   const re = /"([^"]*)"|(\S+)/g;
   let m;
-  while ((m = re.exec(input)) !== null) {
-    tokens.push(m[1] != null ? m[1] : m[2]);
-  }
+  while ((m = re.exec(input)) !== null) tokens.push(m[1] != null ? m[1] : m[2]);
 
-  // tokens now like: [543843, Booster Box, 543844, Booster Bundle]
   const pairs = [];
   for (let i = 0; i < tokens.length; i += 2) {
     const id = (tokens[i] || "").trim();
@@ -271,8 +304,7 @@ async function handleInventoryRemove(message, argsText) {
   const userId = message.author.id;
   const items = portfolios[userId] || [];
 
-  const next = items.filter((it) => it.tcgplayerId !== id);
-  portfolios[userId] = next;
+  portfolios[userId] = items.filter((it) => it.tcgplayerId !== id);
   savePortfolios(portfolios);
 
   return message.reply(`🗑️ Removed ID ${id}. Use !inventorylist to confirm.`);
@@ -363,7 +395,7 @@ client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(CMD_PREFIX)) return;
 
-  if (!isMessageAllowed(message)) {
+  if (!(await isMessageAllowed(message))) {
     try { await message.reply("This bot is restricted; you are not authorized."); } catch (_) {}
     return;
   }
