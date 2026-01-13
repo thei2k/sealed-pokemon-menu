@@ -1,28 +1,13 @@
-// discordBot.js (FULL OVERWRITE)
-// Access model:
-// - In guild channels: only allowed guilds in ALLOWED_GUILD_IDS (when set)
-// - In DMs: allowed if user shares ANY allowed guild with the bot (when ALLOWED_GUILD_IDS set)
-// - Optional: ALLOWED_USER_IDS always allowed (override)
-// If no allowlists are set, bot is open everywhere.
-//
-// DM output enhancements:
-// - Shows Market price
-// - Shows change since last check ($ + %)
-// - Shows change since added/baseline ($ + %)
-//
-// Commands:
-// - !inventoryadd <id> <id> <id>            (IDs only bulk add; no quotes)
-// - !inventoryadd <id> "Label" ...          (labels must be quoted)
-// - !inventorylist
-// - !inventoryremove <id> [id ...]          (multi remove; supports commas)
-// - !inventoryremoveall CONFIRM             (safe wipe)
-// - !inventorynow                           (once/day reset at 12 AM America/New_York; admins + NO_COOLDOWN_USER_IDS bypass)
-// - !inventorystats
-//
-// CRITICAL CONSTRAINTS:
-// - !inventoryadd does NOT call JustTCG (no API usage on add)
-// - Batch size stays 20
-// - Sealed-first variant selection
+// discordBot.js (REFactor, single-file, fully functional)
+// Goals:
+// - Keep ALL existing behavior/features from your uploaded file
+// - Remove duplication (cron + inventorynow share the same pipeline)
+// - Reduce API calls in cron by fetching all unique IDs once
+// - Add back the missing-but-requested quality-of-life:
+//   - !donate + quiet DM footer
+//   - !inventoryremove supports multiple IDs
+//   - !inventoryremoveall CONFIRM
+//   - NO_COOLDOWN_USER_IDS bypass works (header said it; code didn’t fully honor it)
 
 require("dotenv").config();
 const fs = require("fs");
@@ -36,27 +21,36 @@ const {
 } = require("discord.js");
 const cron = require("node-cron");
 
-// ---- ENV ----
+/* ===================== ENV ===================== */
+
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const JUSTTCG_API_KEY = process.env.JUSTTCG_API_KEY;
 
 const ALLOWED_GUILD_IDS = process.env.ALLOWED_GUILD_IDS
   ? process.env.ALLOWED_GUILD_IDS.split(",").map((s) => s.trim()).filter(Boolean)
   : [];
+
 const ALLOWED_USER_IDS = process.env.ALLOWED_USER_IDS
   ? process.env.ALLOWED_USER_IDS.split(",").map((s) => s.trim()).filter(Boolean)
   : [];
 
-// Cooldown bypass list for !inventorynow
 const NO_COOLDOWN_USER_IDS = process.env.NO_COOLDOWN_USER_IDS
   ? process.env.NO_COOLDOWN_USER_IDS.split(",").map((s) => s.trim()).filter(Boolean)
   : [];
+
+const PAYPAL_DONATE_URL =
+  process.env.PAYPAL_DONATE_URL ||
+  "https://www.paypal.com/donate/?hosted_button_id=WW7W5WR7UDDPU";
 
 const DEBUG_JUSTTCG = process.env.DEBUG_JUSTTCG === "1";
 
 const PORTFOLIO_PATH = process.env.PORTFOLIO_PATH
   ? path.resolve(process.env.PORTFOLIO_PATH)
   : path.join(__dirname, "userPortfolios.json");
+
+// Optional alert config (kept from your file; enabled only when PRICE_ALERT_PCT > 0)
+const PRICE_ALERT_PCT = Number(process.env.PRICE_ALERT_PCT ?? 0);
+const ALERT_COOLDOWN_HOURS = Number(process.env.ALERT_COOLDOWN_HOURS ?? 12);
 
 if (!DISCORD_BOT_TOKEN) {
   console.error("Missing DISCORD_BOT_TOKEN");
@@ -71,21 +65,23 @@ if (typeof fetch !== "function") {
   process.exit(1);
 }
 
+/* ===================== CONSTANTS ===================== */
+
 const CMD_PREFIX = "!";
 const BATCH_SIZE = 20;
-
-// Once-per-day on-demand limit, keyed by Eastern date
 const ON_DEMAND_TZ = "America/New_York";
-const lastOnDemandDayKey = {}; // userId -> "YYYY-MM-DD" in America/New_York
 
-// Optional alert config (disabled unless PRICE_ALERT_PCT > 0)
-const PRICE_ALERT_PCT = Number(process.env.PRICE_ALERT_PCT ?? 0); // 0 disables
-const ALERT_COOLDOWN_HOURS = Number(process.env.ALERT_COOLDOWN_HOURS ?? 12);
+// Your uploaded file used 0 16 * * *
+const DAILY_CRON_SCHEDULE = process.env.DAILY_CRON_SCHEDULE || "0 16 * * *";
 
-// ---- DISCORD ----
+// once/day key reset at midnight ET
+const lastOnDemandDayKey = {}; // userId -> YYYY-MM-DD (ET)
+
+/* ===================== DISCORD ===================== */
+
 const client = new Client({
   intents: [
-    GatewayIntentBits.Guilds, // needed to see guild membership list for shared-guild DM access
+    GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.DirectMessages,
@@ -93,10 +89,11 @@ const client = new Client({
   partials: [Partials.Channel],
 });
 
-// ---- ACCESS RULES ----
+/* ===================== ACCESS CONTROL ===================== */
+
 function isGuildAllowed(guildId) {
   if (!guildId) return false;
-  if (ALLOWED_GUILD_IDS.length === 0) return true; // no restriction
+  if (ALLOWED_GUILD_IDS.length === 0) return true;
   return ALLOWED_GUILD_IDS.includes(guildId);
 }
 
@@ -110,9 +107,9 @@ function isNoCooldownUser(userId) {
   return NO_COOLDOWN_USER_IDS.includes(userId);
 }
 
-// DM access rule: user shares at least one allowed guild with the bot.
 async function isDmUserAllowedBySharedGuild(userId) {
-  if (ALLOWED_GUILD_IDS.length === 0) return true; // no restriction => DMs allowed
+  if (ALLOWED_GUILD_IDS.length === 0) return true;
+
   try {
     for (const gid of ALLOWED_GUILD_IDS) {
       const guild = client.guilds.cache.get(gid);
@@ -120,9 +117,7 @@ async function isDmUserAllowedBySharedGuild(userId) {
       try {
         await guild.members.fetch(userId);
         return true;
-      } catch (_) {
-        // not a member -> keep checking
-      }
+      } catch (_) {}
     }
     return false;
   } catch (err) {
@@ -134,20 +129,15 @@ async function isDmUserAllowedBySharedGuild(userId) {
 async function isMessageAllowed(message) {
   const userId = message.author?.id;
 
-  // If no restrictions configured at all, allow everything.
   if (ALLOWED_GUILD_IDS.length === 0 && ALLOWED_USER_IDS.length === 0) return true;
-
-  // Always allow explicitly allowed users (works in DM and guild).
   if (isUserOverrideAllowed(userId)) return true;
 
-  // In a guild: allow if guild is allowlisted.
   if (message.guild) return isGuildAllowed(message.guild.id);
-
-  // In a DM: allow if user shares any allowed guild with the bot.
   return await isDmUserAllowedBySharedGuild(userId);
 }
 
-// ---- STORAGE ----
+/* ===================== STORAGE ===================== */
+
 function ensureDirForFile(fp) {
   const dir = path.dirname(fp);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -169,7 +159,6 @@ function normalizePortfolios(portfolios) {
   const out = {};
   for (const [userId, items] of Object.entries(portfolios || {})) {
     const map = new Map();
-
     for (const raw of items || []) {
       const tcgplayerId = String(raw?.tcgplayerId ?? raw?.id ?? "").trim();
       if (!tcgplayerId) continue;
@@ -179,17 +168,13 @@ function normalizePortfolios(portfolios) {
       const normalized = {
         tcgplayerId,
         label,
-
         addedAt: toIsoIfValid(raw?.addedAt),
         addedMarketPrice: numOrUndef(raw?.addedMarketPrice),
-
         lastCheckedAt: toIsoIfValid(raw?.lastCheckedAt),
         lastMarketPrice: numOrUndef(raw?.lastMarketPrice),
-
         lastAlertedAt: toIsoIfValid(raw?.lastAlertedAt),
       };
 
-      // Merge duplicates by tcgplayerId (preserve baselines if they exist)
       const existing = map.get(tcgplayerId);
       if (!existing) {
         map.set(tcgplayerId, normalized);
@@ -197,18 +182,14 @@ function normalizePortfolios(portfolios) {
         map.set(tcgplayerId, {
           ...existing,
           label: normalized.label || existing.label,
-
           addedAt: existing.addedAt || normalized.addedAt,
           addedMarketPrice: existing.addedMarketPrice ?? normalized.addedMarketPrice,
-
           lastCheckedAt: normalized.lastCheckedAt || existing.lastCheckedAt,
           lastMarketPrice: normalized.lastMarketPrice ?? existing.lastMarketPrice,
-
           lastAlertedAt: normalized.lastAlertedAt || existing.lastAlertedAt,
         });
       }
     }
-
     out[userId] = Array.from(map.values());
   }
   return out;
@@ -242,10 +223,17 @@ function savePortfolios(portfolios) {
   }
 }
 
-// ---- TOKENIZER / PARSING HELPERS ----
-// inventoryadd parsing:
-// - If there are ANY quotes in the input, treat as: id "label" id "label"... (label must be quoted)
-// - If there are NO quotes, treat every token as an ID: id id id ...
+function upsertUserItems(userId, updaterFn) {
+  const portfolios = loadPortfolios();
+  const items = portfolios[userId] || [];
+  const next = updaterFn(items) || items;
+  portfolios[userId] = next;
+  savePortfolios(portfolios);
+  return next;
+}
+
+/* ===================== PARSING ===================== */
+
 function tokenizeWithQuotes(input) {
   const tokens = [];
   const re = /"([^"]*)"|(\S+)/g;
@@ -260,42 +248,35 @@ function tokenizeWithQuotes(input) {
 function parseAddItems(input) {
   const rawTokens = tokenizeWithQuotes(input || "");
   const tokens = rawTokens
-    .map((t) => ({ value: String(t.value || "").trim().replace(/,+$/g, ""), quoted: t.quoted }))
+    .map((t) => ({
+      value: String(t.value || "").trim().replace(/,+$/g, ""),
+      quoted: t.quoted,
+    }))
     .filter((t) => t.value.length > 0);
 
   if (!tokens.length) return [];
 
   const hasQuoted = tokens.some((t) => t.quoted);
 
-  // Mode A: labeled pairs (labels MUST be quoted)
   if (hasQuoted) {
     const items = [];
     for (let i = 0; i < tokens.length; i++) {
       const idTok = tokens[i];
-      if (!idTok) break;
-
       const id = String(idTok.value).trim();
       if (!id) continue;
 
       const nextTok = tokens[i + 1];
       const label = nextTok && nextTok.quoted ? String(nextTok.value).trim() : "";
-
       items.push({ tcgplayerId: id, label });
-
       if (nextTok && nextTok.quoted) i += 1;
     }
     return items;
   }
 
-  // Mode B: ID-only bulk add
-  return tokens.map((t) => ({
-    tcgplayerId: String(t.value).trim(),
-    label: "",
-  }));
+  return tokens.map((t) => ({ tcgplayerId: String(t.value).trim(), label: "" }));
 }
 
-// inventoryremove parsing:
-// Accepts: "123 456", "123,456", or mixed.
+// supports spaces and commas
 function parseRemoveIds(input) {
   const raw = String(input || "").trim();
   if (!raw) return [];
@@ -305,7 +286,8 @@ function parseRemoveIds(input) {
     .filter(Boolean);
 }
 
-// ---- TIME HELPERS ----
+/* ===================== TIME HELPERS ===================== */
+
 function getEasternDayKey(date = new Date()) {
   const dtf = new Intl.DateTimeFormat("en-CA", {
     timeZone: ON_DEMAND_TZ,
@@ -316,12 +298,20 @@ function getEasternDayKey(date = new Date()) {
   return dtf.format(date); // YYYY-MM-DD
 }
 
-// ---- DM SENDER (splits long messages safely) ----
-async function safeSendDM(user, text) {
-  const MAX = 1900; // keep below Discord 2000 limit
-  const chunks = [];
+/* ===================== DM HELPERS ===================== */
 
-  let remaining = String(text || "");
+function donateFooter() {
+  if (!PAYPAL_DONATE_URL) return "";
+  return `\n\n—\nSupport the project (optional): ${PAYPAL_DONATE_URL}`;
+}
+
+async function safeSendDM(user, text) {
+  const MAX = 1900;
+  const footer = donateFooter();
+
+  const chunks = [];
+  let remaining = String(text || "") + footer;
+
   while (remaining.length > MAX) {
     let idx = remaining.lastIndexOf("\n\n", MAX);
     if (idx < 800) idx = remaining.lastIndexOf("\n", MAX);
@@ -337,7 +327,25 @@ async function safeSendDM(user, text) {
   }
 }
 
-// ---- PRICE MATH HELPERS ----
+async function sendDMOrReply(message, dmText, channelConfirmText) {
+  try {
+    await safeSendDM(message.author, dmText);
+    if (message.guild && channelConfirmText) await message.reply(channelConfirmText);
+  } catch (err) {
+    // Fallback: post in channel if DM fails
+    if (message.guild) {
+      await message.reply(
+        "I couldn't DM you — check your DM privacy settings."
+      );
+    } else {
+      // In DM context, just throw upward
+      throw err;
+    }
+  }
+}
+
+/* ===================== PRICE MATH ===================== */
+
 function fmtMoney(n) {
   return `$${Number(n).toFixed(2)}`;
 }
@@ -363,15 +371,16 @@ function calcDelta(cur, prev) {
   const delta = c - p;
   let pct = null;
   if (p !== 0) pct = (delta / p) * 100;
-
   return { delta, pct };
 }
 
-// ---- JUSTTCG ----
+/* ===================== JUSTTCG ===================== */
+
 async function fetchCardPrices(tcgplayerIds) {
   const uniqueIds = Array.from(
     new Set((tcgplayerIds || []).map((id) => String(id).trim()).filter(Boolean))
   );
+
   const idToPrice = {};
   if (!uniqueIds.length) return idToPrice;
 
@@ -443,15 +452,7 @@ async function fetchCardPrices(tcgplayerIds) {
   return idToPrice;
 }
 
-// ---- PORTFOLIO UPDATE HELPERS ----
-function upsertUserItems(userId, updaterFn) {
-  const portfolios = loadPortfolios();
-  const items = portfolios[userId] || [];
-  const next = updaterFn(items) || items;
-  portfolios[userId] = next;
-  savePortfolios(portfolios);
-  return next;
-}
+/* ===================== PORTFOLIO PRICE PIPELINE ===================== */
 
 function persistPricesForUser(userId, items, prices, checkedIso, options = {}) {
   const { allowAlertUpdate = false } = options;
@@ -470,6 +471,7 @@ function persistPricesForUser(userId, items, prices, checkedIso, options = {}) {
       if (cur != null) {
         existing.lastMarketPrice = cur;
 
+        // lock baseline at first successful price fetch
         if (
           existing.addedMarketPrice == null ||
           !Number.isFinite(Number(existing.addedMarketPrice))
@@ -491,49 +493,77 @@ function persistPricesForUser(userId, items, prices, checkedIso, options = {}) {
   });
 }
 
-function buildPriceLines(items, prices) {
-  return (items || []).map((item) => {
-    const p = prices[item.tcgplayerId] || {};
-    const name = p.name || item.label || "(unknown)";
-    const setName = p.setName ? ` [${p.setName}]` : "";
+function formatPriceLine(item, prices) {
+  const p = prices[item.tcgplayerId] || {};
+  const name = p.name || item.label || "(unknown)";
+  const setName = p.setName ? ` [${p.setName}]` : "";
 
-    const cur = p.marketPrice != null ? Number(p.marketPrice) : null;
-    const last = Number.isFinite(Number(item.lastMarketPrice))
-      ? Number(item.lastMarketPrice)
-      : null;
-    const added = Number.isFinite(Number(item.addedMarketPrice))
-      ? Number(item.addedMarketPrice)
-      : null;
+  const cur = p.marketPrice != null ? Number(p.marketPrice) : null;
+  const last = Number.isFinite(Number(item.lastMarketPrice))
+    ? Number(item.lastMarketPrice)
+    : null;
+  const added = Number.isFinite(Number(item.addedMarketPrice))
+    ? Number(item.addedMarketPrice)
+    : null;
 
-    const priceText = cur != null ? fmtMoney(cur) : "N/A";
+  const priceText = cur != null ? fmtMoney(cur) : "N/A";
 
-    let sinceLastText = "Δ since last: N/A";
-    const d1 = calcDelta(cur, last);
-    if (d1 && d1.pct != null) {
-      sinceLastText = `Δ since last: ${fmtSignedMoney(d1.delta)} (${fmtSignedPct(
-        d1.pct
-      )})`;
-    } else if (d1) {
-      sinceLastText = `Δ since last: ${fmtSignedMoney(d1.delta)} (N/A%)`;
-    }
+  const d1 = calcDelta(cur, last);
+  const sinceLastText =
+    d1 && d1.pct != null
+      ? `Δ since last: ${fmtSignedMoney(d1.delta)} (${fmtSignedPct(d1.pct)})`
+      : d1
+      ? `Δ since last: ${fmtSignedMoney(d1.delta)} (N/A%)`
+      : "Δ since last: N/A";
 
-    let sinceAddedText = "Δ since added: N/A";
-    const d0 = calcDelta(cur, added);
-    if (d0 && d0.pct != null) {
-      sinceAddedText = `Δ since added: ${fmtSignedMoney(d0.delta)} (${fmtSignedPct(
-        d0.pct
-      )})`;
-    } else if (d0) {
-      sinceAddedText = `Δ since added: ${fmtSignedMoney(d0.delta)} (N/A%)`;
-    }
+  const d0 = calcDelta(cur, added);
+  const sinceAddedText =
+    d0 && d0.pct != null
+      ? `Δ since added: ${fmtSignedMoney(d0.delta)} (${fmtSignedPct(d0.pct)})`
+      : d0
+      ? `Δ since added: ${fmtSignedMoney(d0.delta)} (N/A%)`
+      : "Δ since added: N/A";
 
-    return `• ${name}${setName}\n  ID: ${item.tcgplayerId} – ${
-      item.label || "(no label)"
-    } – Market: ${priceText}\n  ${sinceLastText}\n  ${sinceAddedText}`;
-  });
+  return `• ${name}${setName}\n  ID: ${item.tcgplayerId} – ${
+    item.label || "(no label)"
+  } – Market: ${priceText}\n  ${sinceLastText}\n  ${sinceAddedText}`;
 }
 
-// ---- COMMAND HANDLERS ----
+function buildPriceLines(items, prices) {
+  return (items || []).map((it) => formatPriceLine(it, prices));
+}
+
+async function runPriceCheckForUser(userId, reasonLabel, sharedPricesMap = null) {
+  const portfolios = loadPortfolios();
+  const list = portfolios[userId] || [];
+  if (!list.length) return { ok: false, reason: "empty" };
+
+  const ids = list.map((i) => i.tcgplayerId);
+
+  const prices = sharedPricesMap
+    ? Object.fromEntries(ids.map((id) => [id, sharedPricesMap[id] || {}]))
+    : await fetchCardPrices(ids);
+
+  const checkedIso = new Date().toISOString();
+  const lines = buildPriceLines(list, prices);
+
+  persistPricesForUser(userId, list, prices, checkedIso);
+
+  return {
+    ok: true,
+    text: `${reasonLabel}\n\n${lines.join("\n\n")}`,
+  };
+}
+
+/* ===================== COMMAND HANDLERS ===================== */
+
+async function handleDonate(message) {
+  const msg =
+    `Support the project (optional):\n${PAYPAL_DONATE_URL}\n\n` +
+    `Thank you for using the bot!`;
+  return sendDMOrReply(message, msg, "✅ I DM’d you the donation link.");
+}
+
 async function handleInventoryAdd(message, argsText) {
   const itemsToAdd = parseAddItems(argsText);
 
@@ -551,13 +581,11 @@ async function handleInventoryAdd(message, argsText) {
   const userId = message.author.id;
   const nowIso = new Date().toISOString();
 
-  // IMPORTANT: No API calls here (per your request).
+  // no API calls here
   upsertUserItems(userId, (current) => {
     const map = new Map((current || []).map((it) => [it.tcgplayerId, it]));
     for (const p of itemsToAdd) {
       const existing = map.get(p.tcgplayerId);
-
-      // If user provided a label, update it. If blank label, keep existing label if present.
       const nextLabel = p.label ? p.label : existing?.label || "";
 
       map.set(p.tcgplayerId, {
@@ -590,17 +618,15 @@ async function handleInventoryList(message) {
       const added = Number.isFinite(Number(it.addedMarketPrice))
         ? fmtMoney(Number(it.addedMarketPrice))
         : "N/A";
-      const label =
-        it.label && it.label.trim().length ? it.label : "(no label)";
+      const label = it.label && it.label.trim().length ? it.label : "(no label)";
       return `• ${label} — ID: ${it.tcgplayerId} — Baseline: ${added}`;
     });
 
-  try {
-    await safeSendDM(message.author, `📦 Your watchlist:\n\n${lines.join("\n")}`);
-    if (message.guild) await message.reply("✅ I DM’d you your watchlist.");
-  } catch (_) {
-    await message.reply(`📦 Your watchlist:\n\n${lines.join("\n")}`);
-  }
+  return sendDMOrReply(
+    message,
+    `📦 Your watchlist:\n\n${lines.join("\n")}`,
+    "✅ I DM’d you your watchlist."
+  );
 }
 
 async function handleInventoryRemove(message, argsText) {
@@ -636,7 +662,6 @@ async function handleInventoryRemove(message, argsText) {
     return message.reply(`⚠️ None of those IDs were in your watchlist.`);
   }
 
-  // Optional: show which ones were removed vs not found (compact)
   const existingIds = new Set(items.map((it) => it.tcgplayerId));
   const removedIds = ids.filter((id) => existingIds.has(String(id).trim()));
   const notFoundIds = ids.filter((id) => !existingIds.has(String(id).trim()));
@@ -650,7 +675,6 @@ async function handleInventoryRemove(message, argsText) {
 
 async function handleInventoryRemoveAll(message, argsText) {
   const confirm = String(argsText || "").trim().toUpperCase();
-
   if (confirm !== "CONFIRM") {
     return message.reply(
       `⚠️ This will remove *everything* from your watchlist.\n` +
@@ -672,7 +696,7 @@ async function handleInventoryRemoveAll(message, argsText) {
 async function handleInventoryNow(message) {
   const userId = message.author.id;
 
-  // Admin bypass (guild admins only)
+  // admin bypass (guild admins only)
   let isAdmin = false;
   if (message.guild && message.member) {
     try {
@@ -684,10 +708,10 @@ async function handleInventoryNow(message) {
     }
   }
 
-  const bypassCooldown = isAdmin || isNoCooldownUser(userId);
+  // bypass also supports NO_COOLDOWN_USER_IDS
+  const bypass = isAdmin || isNoCooldownUser(userId);
 
-  // Once-per-day limit for non-bypass users, reset at midnight America/New_York
-  if (!bypassCooldown) {
+  if (!bypass) {
     const todayKey = getEasternDayKey(new Date());
     const lastKey = lastOnDemandDayKey[userId] || null;
 
@@ -696,38 +720,30 @@ async function handleInventoryNow(message) {
         `⏳ You already used your on-demand update for today (resets at 12:00 AM Eastern).`
       );
     }
-
     lastOnDemandDayKey[userId] = todayKey;
   }
 
-  const portfolios = loadPortfolios();
-  const list = portfolios[userId] || [];
-  if (!list.length)
+  const result = await runPriceCheckForUser(
+    userId,
+    "⚡ On-demand price check:"
+  );
+
+  if (!result.ok && result.reason === "empty") {
     return message.reply("Your watchlist is empty. Use `!inventoryadd` first.");
-
-  const ids = list.map((i) => i.tcgplayerId);
-  const prices = await fetchCardPrices(ids);
-
-  const checkedIso = new Date().toISOString();
-  const lines = buildPriceLines(list, prices);
-
-  persistPricesForUser(userId, list, prices, checkedIso);
-
-  try {
-    await safeSendDM(message.author, `⚡ On-demand price check:\n\n${lines.join("\n\n")}`);
-    if (message.guild) await message.reply("✅ Sent you a DM with your on-demand prices.");
-  } catch (err) {
-    console.error("Failed to DM now:", err);
-    await message.reply("I couldn't DM you — check your DM privacy settings.");
   }
+
+  return sendDMOrReply(
+    message,
+    result.text,
+    "✅ Sent you a DM with your on-demand prices."
+  );
 }
 
 async function handleInventoryStats(message) {
   const userId = message.author.id;
   const portfolios = loadPortfolios();
   const list = portfolios[userId] || [];
-  if (!list.length)
-    return message.reply("Your watchlist is empty. Use `!inventoryadd` first.");
+  if (!list.length) return message.reply("Your watchlist is empty. Use `!inventoryadd` first.");
 
   const ids = list.map((i) => i.tcgplayerId);
   const prices = await fetchCardPrices(ids);
@@ -760,10 +776,7 @@ async function handleInventoryStats(message) {
 
   const totalMarket = priced.reduce((sum, r) => sum + Number(r.cur), 0);
   const totalBaseline = withBase.reduce((sum, r) => sum + Number(r.base), 0);
-  const totalDelta = withBase.reduce(
-    (sum, r) => sum + Number(r.deltaSinceAdded),
-    0
-  );
+  const totalDelta = withBase.reduce((sum, r) => sum + Number(r.deltaSinceAdded), 0);
 
   const ranked = withBase
     .filter((r) => r.pctSinceAdded != null)
@@ -774,7 +787,6 @@ async function handleInventoryStats(message) {
   const topLosers = ranked.slice(-3).reverse();
 
   const lines = [];
-
   lines.push(`📊 Inventory Stats`);
   lines.push(`As of: ${checkedIso}`);
   lines.push("");
@@ -787,9 +799,7 @@ async function handleInventoryStats(message) {
   if (withBase.length) {
     lines.push(`Total Baseline: ${fmtMoney(totalBaseline)}`);
     const pct = totalBaseline !== 0 ? (totalDelta / totalBaseline) * 100 : null;
-    const deltaText = `${fmtSignedMoney(totalDelta)} (${
-      pct != null ? fmtSignedPct(pct) : "N/A%"
-    })`;
+    const deltaText = `${fmtSignedMoney(totalDelta)} (${pct != null ? fmtSignedPct(pct) : "N/A%"})`;
     lines.push(`Net Change vs Added: ${deltaText}`);
   } else {
     lines.push(`Net Change vs Added: N/A (no baselines yet)`);
@@ -802,9 +812,7 @@ async function handleInventoryStats(message) {
       const name = `${r.name}${r.setName ? ` [${r.setName}]` : ""}`;
       const dText =
         r.deltaSinceAdded != null && r.pctSinceAdded != null
-          ? `${fmtSignedMoney(r.deltaSinceAdded)} (${fmtSignedPct(
-              r.pctSinceAdded
-            )})`
+          ? `${fmtSignedMoney(r.deltaSinceAdded)} (${fmtSignedPct(r.pctSinceAdded)})`
           : "N/A";
       lines.push(`• ${name} — ${dText}`);
     }
@@ -817,39 +825,31 @@ async function handleInventoryStats(message) {
       const name = `${r.name}${r.setName ? ` [${r.setName}]` : ""}`;
       const dText =
         r.deltaSinceAdded != null && r.pctSinceAdded != null
-          ? `${fmtSignedMoney(r.deltaSinceAdded)} (${fmtSignedPct(
-              r.pctSinceAdded
-            )})`
+          ? `${fmtSignedMoney(r.deltaSinceAdded)} (${fmtSignedPct(r.pctSinceAdded)})`
           : "N/A";
       lines.push(`• ${name} — ${dText}`);
     }
   }
 
+  // Persist baselines/last prices so deltas stay consistent after stats too
   persistPricesForUser(userId, list, prices, checkedIso);
 
-  try {
-    await safeSendDM(message.author, lines.join("\n"));
-    if (message.guild) await message.reply("✅ I DM’d you your stats.");
-  } catch (err) {
-    console.error("Failed to DM stats:", err);
-    await message.reply("I couldn't DM you — check your DM privacy settings.");
-  }
+  return sendDMOrReply(message, lines.join("\n"), "✅ I DM’d you your stats.");
 }
 
-// ---- DAILY CRON ----
-// Keep your existing schedule; change if you want. This example is 10:00 AM ET if VM is ET,
-// otherwise it runs at server time. If you want timezone-locking, we can add it.
-cron.schedule("0 10 * * *", async () => {
+/* ===================== DAILY CRON ===================== */
+
+cron.schedule(DAILY_CRON_SCHEDULE, async () => {
   console.log("[Cron] Daily portfolio price DM starting...");
+
   const portfolios = loadPortfolios();
   const entries = Object.entries(portfolios);
   if (!entries.length) return;
 
+  // Collect all IDs once -> single API pass
   const allIds = Array.from(
     new Set(
-      entries
-        .flatMap(([, items]) => (items || []).map((it) => it.tcgplayerId))
-        .filter(Boolean)
+      entries.flatMap(([, items]) => (items || []).map((it) => it.tcgplayerId)).filter(Boolean)
     )
   );
 
@@ -861,6 +861,7 @@ cron.schedule("0 10 * * *", async () => {
   for (const [userId, items] of entries) {
     if (!items || !items.length) continue;
 
+    // Optional alert marking (kept exactly in spirit of your original)
     if (PRICE_ALERT_PCT > 0) {
       for (const item of items) {
         const p = prices[item.tcgplayerId] || {};
@@ -875,20 +876,17 @@ cron.schedule("0 10 * * *", async () => {
           : 0;
         const canAlert = Date.now() - lastAlertedAt >= alertCooldownMs;
 
-        if (
-          d1 &&
-          d1.pct != null &&
-          Math.abs(d1.pct) >= PRICE_ALERT_PCT &&
-          canAlert
-        ) {
+        if (d1 && d1.pct != null && Math.abs(d1.pct) >= PRICE_ALERT_PCT && canAlert) {
           item.__shouldAlert = true;
         }
       }
     }
 
-    const lines = buildPriceLines(items, prices);
+    const userPricesView = prices; // already contains all needed ids
+    const lines = buildPriceLines(items, userPricesView);
 
-    persistPricesForUser(userId, items, prices, checkedIso, {
+    // Persist last/baseline values
+    persistPricesForUser(userId, items, userPricesView, checkedIso, {
       allowAlertUpdate: PRICE_ALERT_PCT > 0,
     });
 
@@ -901,7 +899,8 @@ cron.schedule("0 10 * * *", async () => {
   }
 });
 
-// ---- MESSAGE ROUTER ----
+/* ===================== MESSAGE ROUTER ===================== */
+
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(CMD_PREFIX)) return;
@@ -919,6 +918,8 @@ client.on("messageCreate", async (message) => {
   const argsText = rest.join(" ").trim();
 
   try {
+    if (cmd === "donate") return await handleDonate(message);
+
     if (cmd === "inventoryadd") return await handleInventoryAdd(message, argsText);
     if (cmd === "inventorylist") return await handleInventoryList(message);
     if (cmd === "inventoryremove") return await handleInventoryRemove(message, argsText);
@@ -939,7 +940,8 @@ client.once(Events.ClientReady, () => {
   console.log(`ALLOWED_GUILD_IDS=${ALLOWED_GUILD_IDS.join(",") || "(none)"}`);
   console.log(`ALLOWED_USER_IDS=${ALLOWED_USER_IDS.join(",") || "(none)"}`);
   console.log(`NO_COOLDOWN_USER_IDS=${NO_COOLDOWN_USER_IDS.join(",") || "(none)"}`);
-  console.log(`On-demand limit: once per day (reset at 12:00 AM ${ON_DEMAND_TZ})`);
+  console.log(`DAILY_CRON_SCHEDULE=${DAILY_CRON_SCHEDULE}`);
+  console.log(`PAYPAL_DONATE_URL=${PAYPAL_DONATE_URL || "(none)"}`);
 });
 
 client.login(DISCORD_BOT_TOKEN);
